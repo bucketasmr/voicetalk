@@ -21,7 +21,9 @@ const translations = {
         modalBtn: "Unmute Audio",
         micNeeded: "Microphone access is required!",
         errPermission: "Error: Microphone permission denied by user.",
-        errDevice: "Error: No microphone found on this device."
+        errDevice: "Error: No microphone found on this device.",
+        btnCopy: "Copy Logs",
+        btnCopied: "Copied!"
     },
     uk: {
         title: "Глобальний аудіочат",
@@ -37,7 +39,9 @@ const translations = {
         modalBtn: "Увімкнути звук",
         micNeeded: "Потрібен доступ до мікрофона!",
         errPermission: "Помилка: Доступ до мікрофона відхилено користувачем.",
-        errDevice: "Помилка: На цьому пристрої не знайдено мікрофон."
+        errDevice: "Помилка: На цьому пристрої не знайдено мікрофон.",
+        btnCopy: "Скопіювати логи",
+        btnCopied: "Скопійовано!"
     },
     ru: {
         title: "Глобальный аудиочат",
@@ -49,11 +53,13 @@ const translations = {
         statusHostWait: "Вы Хост. Ожидание друзей...",
         statusGuestConnect: "Соединение с хостом...",
         statusConnected: "Связь установлена!",
-        modalText: "Браузер заблокировал звук в фоне. Нажмите для активации голосового потока.",
+        modalText: "Браузер заблокировал звук в фоне. Нажмите для активации голосового потоку.",
         modalBtn: "Включить звук",
         micNeeded: "Нужен доступ к микрофону!",
         errPermission: "Ошибка: Доступ к микрофону отклонен пользователем.",
-        errDevice: "Ошибка: На этом устройстве не найден микрофон."
+        errDevice: "Ошибка: На этом устройстве не найден микрофон.",
+        btnCopy: "Скопировать логи",
+        btnCopied: "Скопировано!"
     }
 };
 
@@ -62,6 +68,7 @@ let currentLang = 'en';
 const joinBtn = document.getElementById('joinBtn');
 const statusText = document.getElementById('statusText');
 const logDiv = document.getElementById('log');
+const copyLogBtn = document.getElementById('copyLogBtn');
 const audioContainer = document.getElementById('remoteAudioContainer');
 const overlay = document.getElementById('audioActivationOverlay');
 const modalBtn = document.getElementById('audioActivateBtn');
@@ -91,6 +98,10 @@ function changeLanguage(lang) {
     modalBtn.innerText = translations[lang].modalBtn;
     modalTxt.innerText = translations[lang].modalText;
     
+    if (copyLogBtn.innerText !== translations.en.btnCopied && copyLogBtn.innerText !== translations.uk.btnCopied && copyLogBtn.innerText !== translations.ru.btnCopied) {
+        copyLogBtn.innerText = translations[lang].btnCopy;
+    }
+    
     if (!joinBtn.disabled) {
         joinBtn.innerText = translations[lang].btnJoin;
     }
@@ -110,7 +121,6 @@ function detectDeviceLanguage() {
 
 detectDeviceLanguage();
 
-// НАДЁЖНАЯ ПОРТ-КОНФИГУРАЦИЯ С STUN/TURN СЕРВЕРАМИ ДЛЯ ОБХОДА МЕЖДУНАРОДНЫХ NAT КАНАЛОВ
 const peerConfig = {
     config: {
         iceServers: [
@@ -218,7 +228,6 @@ function listenForCalls() {
 }
 
 function bindCallEvents(call) {
-    // Вешаем лог на изменение статуса WebRTC соединения (ICE коннект)
     if (call.peerConnection) {
         call.peerConnection.addEventListener('iceconnectionstatechange', () => {
             log(`WebRTC ICE Core Layer Network State Changed: ${call.peerConnection.iceConnectionState}`);
@@ -265,7 +274,6 @@ function addAudioStream(peerId, stream) {
         });
 }
 
-// Слушатель для кнопки ручной разблокировки звука
 modalBtn.addEventListener('click', () => {
     log("User interaction acknowledged. Executing forced playback pipeline refresh...");
     overlay.style.display = 'none';
@@ -279,3 +287,48 @@ modalBtn.addEventListener('click', () => {
             .catch(err => log(`Forced execution fallback crashed: ${err.message}`, "error"));
     });
 });
+
+// ЛОГИКА РАБОТЫ КНОПКИ КОПИРОВАНИЯ ЛОГОВ (С ФИКСОМ ДЛЯ iOS)
+copyLogBtn.addEventListener('click', () => {
+    // Получаем чистый текст логов (убираем HTML теги <br> и <span>)
+    const textToCopy = logDiv.innerText || logDiv.textContent;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => showCopiedFeedback())
+            .catch(err => fallbackCopyText(textToCopy));
+    } else {
+        fallbackCopyText(textToCopy);
+    }
+});
+
+function fallbackCopyText(text) {
+    // Вспомогательный метод для старых версий iOS/Safari, если основной Clipboard API заблокирован
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed"; // Избегаем скролла страницы вниз
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        showCopiedFeedback();
+    } catch (err) {
+        console.error('Fallback copy method failed', err);
+    }
+    document.body.removeChild(textArea);
+}
+
+function showCopiedFeedback() {
+    const originalText = copyLogBtn.innerText;
+    copyLogBtn.innerText = translations[currentLang].btnCopied;
+    copyLogBtn.style.borderColor = '#a6e3a1';
+    copyLogBtn.style.color = '#a6e3a1';
+    
+    setTimeout(() => {
+        copyLogBtn.innerText = translations[currentLang].btnCopy;
+        copyLogBtn.style.borderColor = '#45475a';
+        copyLogBtn.style.color = '#f5e0dc';
+    }, 2000);
+}
