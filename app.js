@@ -1,7 +1,5 @@
-// Фиксированный ID для главной комнаты. Измените, чтобы никто чужой не зашел.
-const ROOM_ID = "my-secret-global-audio-room-2026"; 
-
-// Генерируем случайный ID для гостя, если комната уже создана
+// Фиксированный ID для вашей комнаты. Можете изменить на свой секретный.
+const ROOM_ID = "global-audio-bridge-ukraine-usa-2026"; 
 const MY_GUEST_ID = "guest-" + Math.random().toString(36).substring(2, 9);
 
 let peer = null;
@@ -13,6 +11,25 @@ const statusText = document.getElementById('statusText');
 const logDiv = document.getElementById('log');
 const audioContainer = document.getElementById('remoteAudioContainer');
 
+// Конфигурация серверов для пробития NAT между Украиной и США
+const peerConfig = {
+    config: {
+        iceServers: [
+            // Публичные STUN-сервера Google
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            // Бесплатный TURN-сервер (ретранслятор на случай строгих NAT)
+            {
+                urls: 'turn:all-in-one-turnserver.ddns.net:3478?transport=udp',
+                username: 'guest',
+                credential: 'somepassword'
+            }
+        ],
+        sdpSemantics: 'unified-plan'
+    }
+};
+
 function log(msg) {
     logDiv.innerHTML += `<br>> ${msg}`;
     logDiv.scrollTop = logDiv.scrollHeight;
@@ -23,13 +40,18 @@ joinBtn.addEventListener('click', async () => {
     statusText.innerText = "Запрос микрофона...";
     
     try {
-        // 1. Включаем микрофон
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        // Запрашиваем микрофон с явными настройками (отключаем эхо и шум)
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }, 
+            video: false 
+        });
         log("Микрофон подключен.");
+        statusText.innerText = "Подключение к международной сети...";
         
-        statusText.innerText = "Подключение к комнате...";
-        
-        // 2. Сначала пробуем создать комнату как Хост (главный)
         tryToConnectAsHost();
 
     } catch (err) {
@@ -39,20 +61,19 @@ joinBtn.addEventListener('click', async () => {
     }
 });
 
-// Пытаемся стать создателем комнаты
 function tryToConnectAsHost() {
-    peer = new Peer(ROOM_ID);
+    // Передаем peerConfig вторым аргументом
+    peer = new Peer(ROOM_ID, peerConfig);
     
     peer.on('open', (id) => {
-        log(`Вы создали комнату! Ожидаем друзей...`);
-        statusText.innerText = "Вы — Хост комнаты. Ожидание подключений...";
+        log(`Вы создали комнату (Хост). Ожидаем друга из США...`);
+        statusText.innerText = "Ожидание подключения друга...";
         listenForCalls();
     });
 
     peer.on('error', (err) => {
-        // Если этот ID уже занят (значит друг зашел раньше вас и создал комнату)
         if (err.type === 'unavailable-id') {
-            log("Комната уже создана другом. Подключаемся как гость...");
+            log("Комната уже создана. Подключаемся как гость...");
             connectAsGuest();
         } else {
             log(`Ошибка сети: ${err.type}`);
@@ -60,32 +81,28 @@ function tryToConnectAsHost() {
     });
 }
 
-// Если комната занята, подключаемся как участник
 function connectAsGuest() {
-    // Пересоздаем Peer со случайным ID гостя
-    peer = new Peer(MY_GUEST_ID);
+    peer = new Peer(MY_GUEST_ID, peerConfig);
     
     peer.on('open', (id) => {
-        log(`Вы вошли как гость. Звоним создателю комнаты...`);
-        statusText.innerText = "Соединение с хостом...";
+        log(`Вы вошли как гость. Вызываем хоста...`);
+        statusText.innerText = "Соединение через океан...";
         
-        // Сразу автоматически звоним создателю комнаты
         const call = peer.call(ROOM_ID, localStream);
         
         call.on('stream', (remoteStream) => {
             addAudioStream(ROOM_ID, remoteStream);
         });
         
-        listenForCalls(); // Тоже слушаем входящие на случай новых гостей
+        listenForCalls();
     });
 }
 
-// Слушаем входящие звонки
 function listenForCalls() {
     peer.on('call', (call) => {
         if (connectedPeers.has(call.peer)) return;
         
-        log(`Обнаружено входящее подключение...`);
+        log(`Входящий звонок принят. Обмениваемся аудио-пакетами...`);
         call.answer(localStream);
         
         call.on('stream', (remoteStream) => {
@@ -94,17 +111,29 @@ function listenForCalls() {
     });
 }
 
-// Добавление звука на страницу
 function addAudioStream(peerId, stream) {
     if (connectedPeers.has(peerId)) return;
     connectedPeers.add(peerId);
 
+    // Создаем аудио-тег с обходом ограничений iOS/Сафари
     const audio = document.createElement('audio');
     audio.id = `audio-${peerId}`;
     audio.srcObject = stream;
     audio.autoplay = true;
+    audio.controls = false;
+    
+    // КРИТИЧЕСКИЕ атрибуты для мобильных браузеров (iPhone/Safari)
+    audio.setAttribute('playsinline', 'true');
+    audio.setAttribute('autoplay', 'true');
+    
     audioContainer.appendChild(audio);
     
-    log(`Звук успешно подключен!`);
-    statusText.innerText = `В сети. Собеседников: ${connectedPeers.size}`;
+    // Принудительный пинок для Safari/iOS, который часто блокирует автозвук
+    audio.play().catch(e => {
+        log("Браузер заблокировал автозвук. Нажмите в любом месте экрана.");
+        document.body.addEventListener('click', () => { audio.play(); }, { once: true });
+    });
+    
+    log(`УРА! Звуковой поток успешно пробит и запущен!`);
+    statusText.innerText = `Связь установлена!`;
 }
