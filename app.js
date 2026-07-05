@@ -254,7 +254,6 @@ function addAudioStream(peerId, stream) {
     audioContainer.appendChild(audio);
     activeAudioElements.push(audio);
     
-    // Проверяем программное ограничение автовоспроизведения браузера
     audio.play()
         .then(() => {
             log(`Remote sound track codec unpacked and processing pipeline output is active.`, "success");
@@ -262,8 +261,6 @@ function addAudioStream(peerId, stream) {
         })
         .catch(e => {
             log(`Autoplay policy violation. Audio track renderer stalled. Raising manual override overlay UI window.`, "error");
-            
-            // Если браузер заблокировал звук, показываем модальное окно
             overlay.style.display = 'flex';
         });
 }
@@ -273,7 +270,6 @@ modalBtn.addEventListener('click', () => {
     log("User interaction acknowledged. Executing forced playback pipeline refresh...");
     overlay.style.display = 'none';
     
-    // Перезапускаем все медиапотоки на странице в контексте клика пользователя
     activeAudioElements.forEach(audio => {
         audio.play()
             .then(() => {
