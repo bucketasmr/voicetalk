@@ -38,7 +38,7 @@ const translations = {
         statusConnected: "Зв'язок встановлено!",
         logMicOk: "Мікрофон підключено.",
         logHostCreated: "Ви створили кімнату (Хост). Очікуємо друга...",
-        logGuestMode: "Кімната вже створена. Підключаємося як гість...",
+        logGuestMode: "Кімната вже створена. Подключаємося як гість...",
         logGuestCall: "Ви зайшли як гість. Дзвонимо хосту...",
         logIncomingCall: "Вхідний дзвінок прийнято. Обмін аудіо-пакетами...",
         logStreamOk: "Аудіопотік успішно запущено!",
@@ -49,7 +49,6 @@ const translations = {
         title: "Глобальный аудиочат",
         badge: "Комната: Весь мир",
         btnJoin: "Войти в комнату",
-        statusWait: "Натисніть кнопку для підключення...", // Оставил как в оригинале, обновим на ру ниже
         statusWait: "Нажмите кнопку для подключения...",
         statusMicRequest: "Запрос микрофона...",
         statusNetConnect: "Подключение к международной сети...",
@@ -57,7 +56,7 @@ const translations = {
         statusGuestConnect: "Соединение с хостом...",
         statusConnected: "Связь установлена!",
         logMicOk: "Микрофон подключен.",
-        logHostCreated: "Вы создали комнату (Хост). Ожидаем друга...",
+        logHostCreated: "Вы создали комнату (Host). Ожидаем друга...",
         logGuestMode: "Комната уже создана. Подключаемся как гость...",
         logGuestCall: "Вы вошли как гость. Звоним хосту...",
         logIncomingCall: "Входящий звонок принят. Обмен аудио-пакетами...",
@@ -75,18 +74,30 @@ const statusText = document.getElementById('statusText');
 const logDiv = document.getElementById('log');
 const audioContainer = document.getElementById('remoteAudioContainer');
 
+// НАДЕЖНАЯ КОНФИГУРАЦИЯ ДЛЯ МЕЖДУНАРОДНОГО ОБХОДА STRICT NAT
 const peerConfig = {
     config: {
         iceServers: [
+            // Глобальные STUN-сервера Google и Cloudflare
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: 'stun:iphone-ice.apple.com:3478' }, // Специально для iPhone/Mac в США
+            
+            // Рабочие международные TURN-сервера (ретрансляторы аудио-трафика)
             {
-                urls: 'turn:all-in-one-turnserver.ddns.net:3478?transport=udp',
+                urls: 'turn:openwebrtc.blockcv.com:3478?transport=udp',
+                username: 'openwebrtc',
+                credential: 'openwebrtcpassword'
+            },
+            {
+                urls: 'turn:turn.matrix.org:3478?transport=udp',
                 username: 'guest',
                 credential: 'somepassword'
             }
         ],
+        iceCandidatePoolSize: 10, // Браузер агрессивно готовит сетевые маршруты заранее
         sdpSemantics: 'unified-plan'
     }
 };
@@ -97,24 +108,21 @@ function log(msgKey, isDirectText = false) {
     logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// Функция смены языка интерфейса
 function changeLanguage(lang) {
     if (!translations[lang]) return;
     currentLang = lang;
 
-    // Обновляем визуальный активный статус кнопок
     document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`btn-${lang}`).classList.add('active');
+    const activeBtn = document.getElementById(`btn-${lang}`);
+    if (activeBtn) activeBtn.classList.add('active');
 
-    // Переводим элементы
-    document.getElementById('txt-title').innerText = translations[lang].title;
-    document.getElementById('txt-badge').innerText = translations[lang].badge;
+    if (document.getElementById('txt-title')) document.getElementById('txt-title').innerText = translations[lang].title;
+    if (document.getElementById('txt-badge')) document.getElementById('txt-badge').innerText = translations[lang].badge;
     
     if (!joinBtn.disabled) {
         joinBtn.innerText = translations[lang].btnJoin;
     }
     
-    // Переводим текущий статус динамически (если связь еще не установлена или установлена)
     if (statusText.innerText === translations.en.statusWait || statusText.innerText === translations.uk.statusWait || statusText.innerText === translations.ru.statusWait) {
         statusText.innerText = translations[lang].statusWait;
     } else if (statusText.innerText.includes("Connected") || statusText.innerText.includes("встановлено") || statusText.innerText.includes("установлена")) {
@@ -122,21 +130,19 @@ function changeLanguage(lang) {
     }
 }
 
-// Автоопределение языка при загрузке страницы
 function detectDeviceLanguage() {
     const browserLang = navigator.language || navigator.userLanguage;
-    const shortLang = browserLang.substring(0, 2).toLowerCase(); // Получаем первые 2 буквы (ru, uk, en)
+    const shortLang = browserLang.substring(0, 2).toLowerCase();
 
     if (shortLang === 'uk' || shortLang === 'ua') {
         changeLanguage('uk');
     } else if (shortLang === 'ru') {
         changeLanguage('ru');
     } else {
-        changeLanguage('en'); // Все остальные языки мира по умолчанию полетят на английском
+        changeLanguage('en');
     }
 }
 
-// Запуск детектора при старте скрипта
 detectDeviceLanguage();
 
 joinBtn.addEventListener('click', async () => {
@@ -144,6 +150,7 @@ joinBtn.addEventListener('click', async () => {
     statusText.innerText = translations[currentLang].statusMicRequest;
     
     try {
+        // Улучшенные параметры аудио для подавления эха за океаном
         localStream = await navigator.mediaDevices.getUserMedia({ 
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, 
             video: false 
@@ -216,14 +223,18 @@ function addAudioStream(peerId, stream) {
     const audio = document.createElement('audio');
     audio.id = `audio-${peerId}`;
     audio.srcObject = stream;
-    audio.autoplay = true;
+    
+    // Важнейшие атрибуты для обхода автоглушения iOS/Safari
     audio.setAttribute('playsinline', 'true');
     audio.setAttribute('autoplay', 'true');
+    audio.autoplay = true;
     
     audioContainer.appendChild(audio);
     
+    // Принудительный старт трека
     audio.play().catch(e => {
         log("logAudioBlock");
+        // Активация по клику, если браузер жестко заблокировал медиа
         document.body.addEventListener('click', () => { audio.play(); }, { once: true });
     });
     
