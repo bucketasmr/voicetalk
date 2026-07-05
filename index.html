@@ -22,13 +22,12 @@
             padding: 30px;
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            max-width: 400px;
+            max-width: 420px;
             width: 100%;
             text-align: center;
             border: 1px solid #313244;
             position: relative;
         }
-        /* Блок переключения языков */
         .lang-switcher {
             position: absolute;
             top: 15px;
@@ -86,18 +85,65 @@
             background: #11111b;
             padding: 12px;
             border-radius: 8px;
-            height: 120px;
+            height: 160px;
             overflow-y: auto;
-            font-size: 12px;
+            font-size: 11px;
             text-align: left;
             color: #f5e0dc;
             font-family: monospace;
             border: 1px solid #313244;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
+        /* Всплывающее окно активации звука */
+        .audio-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(17, 17, 27, 0.85);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .audio-modal {
+            background: #313244;
+            padding: 25px 35px;
+            border-radius: 12px;
+            border: 2px solid #f5c2e7;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            max-width: 320px;
+        }
+        .audio-modal p {
+            margin: 0 0 20px 0;
+            font-size: 16px;
+            font-weight: 500;
+            color: #cdd6f4;
+        }
+        .audio-modal button {
+            background: #f5c2e7;
+            color: #11111b;
+            border: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .audio-modal button:hover { background: #eba0b8; }
         #remoteAudioContainer { display: none; }
     </style>
 </head>
 <body>
+
+<div id="audioActivationOverlay" class="audio-overlay">
+    <div class="audio-modal">
+        <p id="txt-modal-alert">Your browser blocked background audio. Click to activate voice stream.</p>
+        <button id="audioActivateBtn">Unmute Audio</button>
+    </div>
+</div>
 
 <div class="card">
     <div class="lang-switcher">
@@ -114,7 +160,7 @@
     <div class="status" id="statusText">Click button to connect...</div>
     
     <div id="remoteAudioContainer"></div>
-    <div id="log">System ready.</div>
+    <div id="log">System ready. Click 'Join Room'.</div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
