@@ -81,6 +81,27 @@
             margin: 20px 0;
             min-height: 22px;
         }
+        /* Стили для контейнера логов и кнопки копирования */
+        .log-container {
+            margin-top: 15px;
+            text-align: right;
+        }
+        .copy-btn {
+            background: #313244;
+            color: #f5e0dc;
+            border: 1px solid #45475a;
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #45475a;
+            color: #cdd6f4;
+        }
         #log {
             background: #11111b;
             padding: 12px;
@@ -95,7 +116,6 @@
             white-space: pre-wrap;
             word-break: break-all;
         }
-        /* Всплывающее окно активации звука */
         .audio-overlay {
             display: none;
             position: fixed;
@@ -160,7 +180,11 @@
     <div class="status" id="statusText">Click button to connect...</div>
     
     <div id="remoteAudioContainer"></div>
-    <div id="log">System ready. Click 'Join Room'.</div>
+    
+    <div class="log-container">
+        <button id="copyLogBtn" class="copy-btn">Copy Logs</button>
+        <div id="log">System ready. Click 'Join Room'.</div>
+    </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
