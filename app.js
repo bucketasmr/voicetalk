@@ -404,11 +404,57 @@ function setupDataChannelListeners(conn) {
                 log("Холст полностью очищен удаленным участником.");
                 break;
 
-            case "kick-signal":
+case "kick-signal":
                 log("Вы были исключены из этой комнаты.", "error");
-                alert("Вы были исключены модератором сессии.");
+                
+                // Отключаем PeerJS сессию, чтобы освободить слот
                 if (peer) peer.destroy();
-                location.reload();
+
+                // Динамически создаем красивое полноэкранное уведомление вместо alert()
+                const kickOverlay = document.createElement('div');
+                kickOverlay.style.position = 'fixed';
+                kickOverlay.style.top = '0';
+                kickOverlay.style.left = '0';
+                kickOverlay.style.width = '100vw';
+                kickOverlay.style.height = '100vh';
+                kickOverlay.style.backgroundColor = 'rgba(17, 17, 27, 0.98)';
+                kickOverlay.style.zIndex = '10000';
+                kickOverlay.style.display = 'flex';
+                kickOverlay.style.flexDirection = 'column';
+                kickOverlay.style.alignItems = 'center';
+                kickOverlay.style.justifyContent = 'center';
+                kickOverlay.style.color = '#f38ba8';
+                kickOverlay.style.fontFamily = 'sans-serif';
+                kickOverlay.style.textAlign = 'center';
+                kickOverlay.style.padding = '20px';
+
+                // Текст уведомления на основе текущего языка
+                let kickTitle = "Вы были исключены модератором сессии.";
+                if (currentLang === 'en') kickTitle = "You have been kicked by the moderator.";
+                if (currentLang === 'ua') kickTitle = "Вас було виключено модератором сесії.";
+
+                kickOverlay.innerHTML = `
+                    <h1 style="font-size: 28px; margin-bottom: 10px;">${kickTitle}</h1>
+                    <p style="color: #a6adc8; font-size: 16px;">
+                        Перезагрузка страницы через <span id="kickCountdown" style="font-weight:bold; color:#fab387;">5</span> сек...
+                    </p>
+                `;
+                document.body.appendChild(kickOverlay);
+
+                // Таймер обратного отсчета для визуала
+                let secondsLeft = 5;
+                const countdownInterval = setInterval(() => {
+                    secondsLeft--;
+                    const counterEl = document.getElementById('kickCountdown');
+                    if (counterEl) counterEl.innerText = secondsLeft;
+                }, 1000);
+
+                // Автоматическая перезагрузка ровно через 5 секунд
+                setTimeout(() => {
+                    clearInterval(countdownInterval);
+                    location.reload();
+                }, 5000);
+                
                 break;
 
             // ⚠️ СИГНАЛ ЯДЕРНОГО СБРОСА КОМНАТЫ
