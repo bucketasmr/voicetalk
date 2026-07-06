@@ -35,18 +35,17 @@
             top: 15px;
             right: 15px;
             display: flex;
-            gap: 8px;
+            gap: 6px;
         }
         .lang-btn {
             background: #313244;
-            color: #cdd6f4;
             border: 1px solid #45475a;
-            padding: 5px 10px;
+            color: #cdd6f4;
+            padding: 4px 8px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
-            font-weight: bold;
-            transition: all 0.2s ease;
+            transition: background 0.2s;
         }
         .lang-btn.active {
             background: #cba6f7;
@@ -55,222 +54,239 @@
         }
         h1 {
             color: #cba6f7;
-            margin-bottom: 5px;
+            margin-top: 0;
+            margin-bottom: 10px;
             font-size: 28px;
         }
         .room-badge {
+            display: inline-block;
             background: #313244;
-            color: #f5e0dc;
             padding: 6px 14px;
             border-radius: 20px;
-            font-size: 13px;
-            display: inline-block;
+            font-size: 14px;
+            color: #a6adc8;
             margin-bottom: 25px;
-            font-weight: 600;
             border: 1px solid #45475a;
         }
-        .setup-row {
+        .nickname-container {
+            margin-bottom: 20px;
             display: flex;
             justify-content: center;
+            gap: 10px;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
         }
-        .input-field {
+        .nickname-input {
             background: #313244;
             border: 1px solid #45475a;
             color: #cdd6f4;
-            padding: 12px 16px;
+            padding: 10px 15px;
             border-radius: 8px;
-            font-size: 15px;
+            font-size: 16px;
             outline: none;
-            width: 220px;
-            transition: border-color 0.2s;
+            width: 200px;
+            text-align: center;
         }
-        .input-field:focus {
-            border-color: #cba6f7;
-        }
-        .join-btn {
-            background: linear-gradient(135deg, #cba6f7 0%, #89b4fa 100%);
+        .btn-join {
+            background: #a6e3a1;
             color: #11111b;
             border: none;
-            padding: 12px 28px;
-            font-size: 15px;
-            font-weight: bold;
+            padding: 12px 30px;
             border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
+            box-shadow: 0 4px 14px rgba(166,227,161,0.3);
             transition: transform 0.1s, opacity 0.2s;
         }
-        .join-btn:hover {
-            opacity: 0.9;
-        }
-        .join-btn:active {
+        .btn-join:active {
             transform: scale(0.98);
+        }
+        .btn-join:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .status-container {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #fab387;
+            min-height: 20px;
+        }
+        .media-controls {
+            margin-top: 20px;
+            display: none;
+            gap: 10px;
+            justify-content: center;
         }
         .control-btn {
             background: #313244;
-            color: #cdd6f4;
             border: 1px solid #45475a;
-            padding: 12px 20px;
-            font-size: 15px;
-            font-weight: 600;
+            color: #cdd6f4;
+            padding: 10px 20px;
             border-radius: 8px;
+            font-size: 14px;
             cursor: pointer;
-            display: none;
-            margin: 0 5px;
-            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
         }
         .control-btn:hover {
             background: #45475a;
         }
-        .control-btn.active-state {
-            background: #f38ba8 !important;
-            color: #11111b !important;
-            border-color: #f38ba8 !important;
-        }
-        .status-text {
-            margin: 15px 0;
-            font-size: 14px;
-            color: #a6adc8;
-            font-style: italic;
-            min-height: 20px;
-        }
-        
-        /* Панель Администратора */
-        .host-panel {
-            display: none;
-            background: #1e1e2e;
-            border: 2px solid #f38ba8;
-            border-radius: 12px;
-            padding: 15px;
-            margin: 20px auto;
-            text-align: left;
-            max-width: 900px;
-            box-sizing: border-box;
-        }
-        .host-panel h3 {
-            color: #f38ba8;
-            margin-top: 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 16px;
-        }
-        .host-refresh-btn {
-            background: #89b4fa;
-            color: #11111b;
-            border: none;
-            padding: 6px 12px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        .host-user-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 160px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-        .host-user-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #11111b;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #313244;
-        }
-        .host-kick-btn {
+        .control-btn.active-off {
             background: #f38ba8;
             color: #11111b;
-            border: none;
-            padding: 4px 10px;
-            font-size: 12px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
+            border-color: #f38ba8;
         }
-
-        .video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 15px;
+        .video-grid-wrapper {
             margin-top: 25px;
-        }
-        .video-wrapper {
             background: #11111b;
             border-radius: 12px;
-            overflow: hidden;
+            padding: 15px;
+            border: 1px solid #313244;
+            display: none;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 15px;
+            justify-content: center;
+        }
+        .video-container {
             position: relative;
+            background: #1e1e2e;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #45475a;
             aspect-ratio: 4/3;
-            border: 2px solid #313244;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-            transition: border-color 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: border-color 0.3s;
         }
-        .video-wrapper.speaking {
-            border-color: #a6e3a1 !important;
-            box-shadow: 0 0 12px rgba(166, 227, 161, 0.4);
+        .video-container.speaking {
+            border-color: #a6e3a1;
+            box-shadow: 0 0 12px rgba(166,227,161,0.5);
         }
-        .video-wrapper video {
+        video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            background: #000;
+            background: #11111b;
         }
         .video-label {
             position: absolute;
             bottom: 8px;
             left: 8px;
-            background: rgba(17, 17, 27, 0.75);
-            padding: 4px 10px;
-            border-radius: 6px;
+            background: rgba(17,17,27,0.75);
+            padding: 4px 8px;
+            border-radius: 4px;
             font-size: 12px;
-            font-weight: 600;
-            max-width: 80%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            border: 1px solid rgba(255,255,255,0.05);
+            color: #cdd6f4;
+            z-index: 2;
+            pointer-events: none;
         }
-        .my-video {
-            border-color: #cba6f7;
+        .host-badge {
+            color: #fab387;
+            font-weight: bold;
+            margin-right: 4px;
         }
-        .my-video .video-label {
-            color: #cba6f7;
+        .kick-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #f38ba8;
+            color: #11111b;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 3;
+            display: none;
         }
-        
+        .host-panel {
+            margin-top: 20px;
+            background: #181825;
+            border: 1px solid #f38ba8;
+            border-radius: 8px;
+            padding: 12px;
+            display: none;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .host-panel h3 {
+            margin-top: 0;
+            color: #f38ba8;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .host-user-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #313244;
+        }
+        .host-user-row:last-child {
+            border-bottom: none;
+        }
+        .host-kick-inline-btn {
+            background: #f38ba8;
+            color: #11111b;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .split-layout {
+            display: none;
+            margin-top: 25px;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        @media(max-width: 768px) {
+            .split-layout {
+                grid-template-columns: 1fr;
+            }
+        }
         .chat-container {
             background: #11111b;
-            border: 1px solid #313244;
             border-radius: 12px;
-            margin-top: 25px;
-            display: none;
+            border: 1px solid #313244;
+            padding: 15px;
+            display: flex;
             flex-direction: column;
-            text-align: left;
-            height: 250px;
+            height: 380px;
             box-sizing: border-box;
         }
         .chat-messages {
             flex: 1;
-            padding: 12px;
             overflow-y: auto;
+            background: #1e1e2e;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: left;
             font-size: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
+            border: 1px solid #313244;
+            margin-bottom: 10px;
         }
         .chat-msg-item {
+            margin-bottom: 8px;
             line-height: 1.4;
             word-break: break-word;
         }
+        .chat-msg-user {
+            color: #cba6f7;
+            font-weight: bold;
+        }
         .chat-input-row {
             display: flex;
-            border-top: 1px solid #313244;
-            padding: 8px;
             gap: 8px;
         }
         #chatInput {
@@ -280,11 +296,11 @@
             color: #cdd6f4;
             padding: 8px 12px;
             border-radius: 6px;
-            outline: none;
             font-size: 14px;
+            outline: none;
         }
         .chat-send-btn {
-            background: #cba6f7;
+            background: #89b4fa;
             color: #11111b;
             border: none;
             padding: 8px 16px;
@@ -292,108 +308,123 @@
             font-weight: bold;
             cursor: pointer;
         }
-
         .paint-container {
             background: #11111b;
-            border: 1px solid #313244;
             border-radius: 12px;
-            margin-top: 25px;
-            padding: 12px;
-            display: none;
+            border: 1px solid #313244;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            height: 380px;
+            box-sizing: border-box;
+            align-items: center;
         }
         .paint-toolbar {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            width: 100%;
             margin-bottom: 10px;
+            gap: 5px;
             flex-wrap: wrap;
-            gap: 10px;
         }
         .tool-group {
             display: flex;
             align-items: center;
             gap: 8px;
         }
+        .paint-toolbar input[type="color"] {
+            background: none;
+            border: none;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            padding: 0;
+        }
+        .paint-toolbar input[type="range"] {
+            width: 70px;
+            accent-color: #cba6f7;
+        }
         .history-btn {
             background: #313244;
-            color: #cdd6f4;
             border: 1px solid #45475a;
-            padding: 6px 12px;
+            color: #cdd6f4;
+            padding: 4px 10px;
             border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
+            font-size: 14px;
         }
         .clear-btn {
             background: #f38ba8;
             color: #11111b;
             border: none;
+            font-weight: bold;
         }
         canvas {
             background: #1e1e2e;
-            border: 1px solid #313244;
             border-radius: 8px;
+            border: 1px solid #313244;
             cursor: crosshair;
             width: 100%;
-            height: auto;
-            max-width: 100%;
-            display: block;
+            flex: 1;
             touch-action: none;
         }
-
         .toggle-log-btn {
             background: #313244;
-            color: #a6adc8;
             border: 1px solid #45475a;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 30px;
+            color: #a6adc8;
+            padding: 6px 16px;
+            border-radius: 6px;
             font-size: 13px;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle-log-btn:hover {
+            background: #45475a;
         }
         .log-section {
-            background: #11111b;
-            border: 1px solid #313244;
-            border-radius: 12px;
-            width: 100%;
-            margin-top: 15px;
-            padding: 15px;
-            box-sizing: border-box;
             display: none;
-            text-align: left;
+            margin-top: 15px;
+            width: 100%;
+            background: #11111b;
+            border-radius: 10px;
+            padding: 12px;
+            border: 1px solid #313244;
+            box-sizing: border-box;
         }
         .log-toolbar {
             display: flex;
             justify-content: flex-end;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
         }
         .copy-log-btn {
-            background: #89b4fa;
-            color: #11111b;
+            background: #45475a;
             border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: bold;
+            color: #cdd6f4;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
             cursor: pointer;
         }
+        .copy-log-btn:hover {
+            background: #585b70;
+        }
         .log-output {
-            max-height: 200px;
+            max-height: 150px;
             overflow-y: auto;
-            font-family: 'Courier New', Courier, monospace;
+            text-align: left;
+            font-family: monospace;
             font-size: 12px;
             white-space: pre-wrap;
             color: #a6e3a1;
-            line-height: 1.5;
+            line-height: 1.4;
         }
-        .log-line {
-            margin: 2px 0;
-        }
-        .log-error { color: #f38ba8; }
-        .log-warn { color: #f9e2af; }
-
         .audio-blocker-overlay {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
             background: rgba(17,17,27,0.95);
             z-index: 9999;
             display: none;
@@ -405,84 +436,96 @@
             text-align: center;
         }
         .audio-blocker-btn {
-            background: #a6e3a1;
+            background: #f38ba8;
             color: #11111b;
-            border: none;
-            padding: 16px 32px;
             font-size: 18px;
             font-weight: bold;
-            border-radius: 10px;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
             cursor: pointer;
             margin-top: 20px;
-            box-shadow: 0 4px 20px rgba(166,227,161,0.3);
+            box-shadow: 0 4px 14px rgba(243,139,168,0.4);
         }
     </style>
 </head>
 <body>
 
-    <div class="lang-switcher">
-        <button class="lang-btn active" id="langEn">EN</button>
-        <button class="lang-btn" id="langUa">UA</button>
-        <button class="lang-btn" id="langRu">RU</button>
-    </div>
-
     <div class="card">
-        <h1 id="mainTitle">Global Video & Paint Chat</h1>
-        <div class="room-badge" id="roomBadge">Room: World Wide Grid</div>
-
-        <div class="setup-row">
-            <input type="text" id="nicknameInput" class="input-field" placeholder="Your Nickname..." maxlength="20">
-            <button id="joinBtn" class="join-btn">Join Room</button>
-            
-            <button id="muteBtn" class="control-btn">Mute Mic</button>
-            <button id="camBtn" class="control-btn">Turn Off Cam</button>
-            <button id="switchCamBtn" class="control-btn" style="background: #a6e3a1; color: #11111b; border: none;">🔄 Switch Camera</button>
+        <div class="lang-switcher">
+            <button id="langEn" class="lang-btn active">EN</button>
+            <button id="langRu" class="lang-btn">RU</button>
+            <button id="langUa" class="lang-btn">UA</button>
         </div>
 
-        <div id="statusText" class="status-text">Click button to connect...</div>
+        <h1 id="mainTitle">Global Video & Paint Chat</h1>
+        <div id="roomBadge" class="room-badge">Room: World Wide Grid</div>
+
+        <div class="nickname-container">
+            <input type="text" id="nicknameInput" class="nickname-input" value="User" placeholder="Nickname" maxlength="25">
+            <button id="joinBtn" class="btn-join">Join Room</button>
+        </div>
+
+        <div id="statusDiv" class="status-container">Click button to connect...</div>
+
+        <div id="mediaControls" class="media-controls">
+            <button id="muteMicBtn" class="control-btn">
+                <span id="micIcon">🎤</span> <span id="micText">Mute Mic</span>
+            </button>
+            <button id="toggleCamBtn" class="control-btn">
+                <span id="camIcon">📷</span> <span id="camText">Cam Off</span>
+            </button>
+            <button id="switchCamBtn" class="control-btn" style="display: none;">
+                <span>🔄</span> <span id="switchCamText">Switch Camera</span>
+            </button>
+        </div>
 
         <div id="hostPanel" class="host-panel">
-            <h3>
-                👑 Room Management Panel (Host Mode)
-                <button id="refreshUsersBtn" class="host-refresh-btn">🔄 Refresh List</button>
-            </h3>
-            <div id="hostUserList" class="host-user-list"></div>
+            <h3 id="hostPanelTitle">Moderator Control Panel</h3>
+            <div id="hostUsersList"></div>
         </div>
 
-        <div id="videoGrid" class="video-grid"></div>
+        <div id="videoGridWrapper" class="video-grid-wrapper">
+            <div id="videoGrid" class="video-grid"></div>
+        </div>
 
-        <div id="chatContainer" class="chat-container">
-            <div id="chatMessages" class="chat-messages"></div>
-            <div class="chat-input-row">
-                <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
-                <button id="sendMsgBtn" class="chat-send-btn">Send</button>
+        <div id="splitLayout" class="split-layout">
+            <div class="chat-container">
+                <div id="chatMessages" class="chat-messages"></div>
+                <div class="chat-input-row">
+                    <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
+                    <button id="sendMsgBtn" class="chat-send-btn">Send</button>
+                </div>
+            </div>
+
+            <div id="paintContainer" class="paint-container">
+                <div class="paint-toolbar">
+                    <div class="tool-group">
+                        <input type="color" id="brushColor" value="#cba6f7">
+                        <input type="range" id="brushSize" min="1" max="40" value="5">
+                        <input type="range" id="brushOpacity" min="0.1" max="1.0" step="0.1" value="1.0">
+                    </div>
+                    <div class="tool-group">
+                        <button id="undoBtn" class="history-btn">↶</button>
+                        <button id="redoBtn" class="history-btn">↷</button>
+                        <button id="clearBtn" class="history-btn clear-btn">🗑️ Clear</button>
+                    </div>
+                </div>
+                <canvas id="paintCanvas" width="500" height="320"></canvas>
             </div>
         </div>
 
-        <div id="paintContainer" class="paint-container">
-            <div class="paint-toolbar">
-                <div class="tool-group">
-                    <input type="color" id="brushColor" value="#cba6f7">
-                    <input type="range" id="brushSize" min="1" max="40" value="5">
-                    <input type="range" id="brushOpacity" min="0.1" max="1.0" step="0.1" value="1.0">
-                </div>
-                <div class="tool-group">
-                    <button id="undoBtn" class="history-btn">↶</button>
-                    <button id="redoBtn" class="history-btn">↷</button>
-                    <button id="clearBtn" class="history-btn clear-btn">🗑️ Clear</button>
-                </div>
+        <div class="control-row" style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+            <button id="toggleLogBtn" class="toggle-log-btn">Show Console Logs</button>
+            <button id="emergencyRestartBtn" class="toggle-log-btn" style="background: #f38ba8; color: #11111b; font-weight: bold; border-radius: 6px; padding: 6px 12px; cursor: pointer; border: none;">Emergency Restart</button>
+        </div>
+        
+        <div id="logSection" class="log-section">
+            <div class="log-toolbar">
+                <button id="copyLogBtn" class="copy-log-btn">Copy Logs</button>
             </div>
-            <canvas id="paintCanvas" width="500" height="320"></canvas>
+            <div id="logDiv" class="log-output"></div>
         </div>
-    </div>
-
-    <button id="toggleLogBtn" class="toggle-log-btn">Show Console Logs</button>
-    
-    <div id="logSection" class="log-section">
-        <div class="log-toolbar">
-            <button id="copyLogBtn" class="copy-log-btn">Copy Logs</button>
-        </div>
-        <div id="logDiv" class="log-output"></div>
     </div>
 
     <div id="audioOverlay" class="audio-blocker-overlay">
@@ -490,7 +533,7 @@
         <button id="audioOverlayBtn" class="audio-blocker-btn">Unmute Audio</button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
