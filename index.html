@@ -75,13 +75,34 @@
         button.main-btn:hover { background: #94e2d5; }
         button.main-btn:active { transform: scale(0.98); }
         button.main-btn:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; }
+        
+        /* Стили для кнопки управления микрофоном */
+        .mute-btn {
+            display: none; /* Скрыта до момента подключения микрофона */
+            background: #f9e2af;
+            color: #11111b;
+            border: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 12px;
+            transition: transform 0.1s, background 0.2s;
+        }
+        .mute-btn:active { transform: scale(0.98); }
+        .mute-btn.muted {
+            background: #f38ba8;
+            color: #11111b;
+        }
+
         .status {
             font-size: 15px;
             color: #bac2de;
             margin: 20px 0;
             min-height: 22px;
         }
-        /* Стили для контейнера логов и кнопки копирования */
         .log-container {
             margin-top: 15px;
             text-align: right;
@@ -176,6 +197,7 @@
     <div class="room-badge" id="txt-badge">Room: World Wide</div>
     
     <button id="joinBtn" class="main-btn">Join Room</button>
+    <button id="muteBtn" class="mute-btn">Mute Mic</button>
     
     <div class="status" id="statusText">Click button to connect...</div>
     
