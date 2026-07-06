@@ -8,11 +8,22 @@ let reconnectInterval = null;
 let myNickname = "User";
 const connectedPeers = new Set();
 const activeAudioElements = [];
-const activeDataConnections = new Set(); // Хранение каналов данных чата
+const activeDataConnections = new Set(); 
+
+// Переменные для рисования холста
+let canvas, ctx;
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+let currentStroke = []; // Хранит текущую рисуемую линию
+
+// База данных истории для Undo/Redo
+let drawingHistory = []; 
+let redoStack = [];
 
 const translations = {
     en: {
-        title: "Global Audio Chat",
+        title: "Global Audio & Paint Chat",
         badge: "Room: World Wide",
         btnJoin: "Join Room",
         statusWait: "Click button to connect...",
@@ -41,7 +52,7 @@ const translations = {
         joinedChat: "joined the chat."
     },
     uk: {
-        title: "Глобальний аудіочат",
+        title: "Глобальний аудіо та малювальний чат",
         badge: "Кімната: Світ",
         btnJoin: "Увійти в кімнату",
         statusWait: "Натисніть кнопку для підключення...",
@@ -70,13 +81,13 @@ const translations = {
         joinedChat: "приєднується до чату."
     },
     ru: {
-        title: "Глобальный аудиочат",
+        title: "Глобальный аудио и рисовальный чат",
         badge: "Комната: Весь мир",
         btnJoin: "Войти в комнату",
         statusWait: "Нажмите кнопку для подключения...",
         statusMicRequest: "Запрос разрешения на микрофон...",
         statusNetConnect: "Подключение к международной сети...",
-        statusHostWait: "Вы Хост. Ожидание друзей...",
+        statusHostWait: "Вы Хост. Ование друзей...",
         statusGuestConnect: "Соединение с хостом...",
         statusConnected: "Связь установлена!",
         statusReconnecting: "Связь разорвана. Переподключение...",
@@ -102,7 +113,7 @@ const translations = {
 
 let currentLang = 'en';
 
-// Нахождение DOM элементов
+// Поиск DOM элементов
 const joinBtn = document.getElementById('joinBtn');
 const muteBtn = document.getElementById('muteBtn');
 const statusText = document.getElementById('statusText');
@@ -113,7 +124,6 @@ const overlay = document.getElementById('audioActivationOverlay');
 const modalBtn = document.getElementById('audioActivateBtn');
 const modalTxt = document.getElementById('txt-modal-alert');
 
-// Элементы нового функционала (Имя, Чат, Логи)
 const nameSetupOverlay = document.getElementById('nameSetupOverlay');
 const usernameInput = document.getElementById('usernameInput');
 const saveNameBtn = document.getElementById('saveNameBtn');
@@ -126,6 +136,14 @@ const sendMsgBtn = document.getElementById('sendMsgBtn');
 
 const toggleLogBtn = document.getElementById('toggleLogBtn');
 const logSection = document.getElementById('logSection');
+
+// Холст элементы
+const paintContainer = document.getElementById('paintContainer');
+const brushColorInput = document.getElementById('brushColor');
+const brushSizeInput = document.getElementById('brushSize');
+const brushOpacityInput = document.getElementById('brushOpacity');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
 
 let logsVisible = false;
 
@@ -140,7 +158,6 @@ function log(msg, type = 'info') {
     logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// Переключение языков
 function changeLanguage(lang) {
     if (!translations[lang]) return;
     currentLang = lang;
@@ -168,21 +185,9 @@ function changeLanguage(lang) {
         copyLogBtn.innerText = translations[lang].btnCopy;
     }
     
-    if (!joinBtn.disabled) {
-        joinBtn.innerText = translations[lang].btnJoin;
-    }
-
-    if (isMuted) {
-        muteBtn.innerText = translations[lang].btnUnmute;
-    } else {
-        muteBtn.innerText = translations[lang].btnMute;
-    }
-    
-    if (statusText.innerText.includes("Connection lost") || statusText.innerText.includes("Зв'язок розірвано") || statusText.innerText.includes("Связь разорвана")) {
-        statusText.innerText = translations[lang].statusReconnecting;
-    } else if (['Click button to connect...', 'Натисніть кнопку для підключення...', 'Нажмите кнопку для подключения...'].includes(statusText.innerText)) {
-        statusText.innerText = translations[lang].statusWait;
-    }
+    if (!joinBtn.disabled) joinBtn.innerText = translations[lang].btnJoin;
+    if (isMuted) muteBtn.innerText = translations[lang].btnUnmute;
+    else muteBtn.innerText = translations[lang].btnMute;
 }
 
 function detectDeviceLanguage() {
@@ -195,21 +200,178 @@ function detectDeviceLanguage() {
 
 detectDeviceLanguage();
 
-// Сохранение имени при входе
+// Конфигурация холста
+function initCanvas() {
+    canvas = document.getElementById('paintCanvas');
+    ctx = canvas.getContext('2d');
+    
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Слушатели мыши
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+
+    // Слушатели тач-скрина (смартфоны)
+    canvas.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousedown', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousemove', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+        });
+        canvas.dispatchEvent(mouseEvent);
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', () => {
+        const mouseEvent = new MouseEvent('mouseup', {});
+        canvas.dispatchEvent(mouseEvent);
+    }, { passive: true });
+}
+
+function getCanvasCoordinates(e) {
+    const rect = canvas.getBoundingClientRect();
+    // Рассчитываем точные координаты с учетом масштабирования CSS
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    return { x, y };
+}
+
+function startDrawing(e) {
+    isDrawing = true;
+    const coords = getCanvasCoordinates(e);
+    lastX = coords.x;
+    lastY = coords.y;
+
+    currentStroke = {
+        id: "stroke-" + Math.random().toString(36).substring(2, 9),
+        color: brushColorInput.value,
+        size: parseInt(brushSizeInput.value),
+        opacity: parseFloat(brushOpacityInput.value),
+        points: [{ x: lastX, y: lastY }]
+    };
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    const coords = getCanvasCoordinates(e);
+    const x = coords.x;
+    const y = coords.y;
+
+    // Отрисовка на своем экране мгновенно
+    ctx.beginPath();
+    ctx.strokeStyle = convertHexToRGBA(currentStroke.color, currentStroke.opacity);
+    ctx.lineWidth = currentStroke.size;
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    lastX = x;
+    lastY = y;
+    currentStroke.points.push({ x, y });
+
+    // Отправка координат в реальном времени другим
+    broadcastPaintData({
+        type: 'paint-live-draw',
+        color: currentStroke.color,
+        size: currentStroke.size,
+        opacity: currentStroke.opacity,
+        from: currentStroke.points[currentStroke.points.length - 2],
+        to: { x, y }
+    });
+}
+
+function stopDrawing() {
+    if (!isDrawing) return;
+    isDrawing = false;
+    
+    if (currentStroke && currentStroke.points.length > 0) {
+        drawingHistory.push(currentStroke);
+        redoStack = []; // Очищаем стек вперед при новом рисовании
+
+        broadcastPaintData({
+            type: 'paint-commit-stroke',
+            stroke: currentStroke
+        });
+    }
+    currentStroke = null;
+}
+
+function convertHexToRGBA(hex, opacity) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+// Перерисовка всего холста на основе локальной истории
+function redrawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    drawingHistory.forEach(stroke => {
+        if (stroke.points.length < 1) return;
+        ctx.beginPath();
+        ctx.strokeStyle = convertHexToRGBA(stroke.color, stroke.opacity);
+        ctx.lineWidth = stroke.size;
+        
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+            ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        ctx.stroke();
+    });
+}
+
+// Логика кнопок Undo / Redo
+undoBtn.addEventListener('click', () => {
+    if (drawingHistory.length === 0) return;
+    const popped = drawingHistory.pop();
+    redoStack.push(popped);
+    redrawCanvas();
+
+    broadcastPaintData({ type: 'paint-undo' });
+});
+
+redoBtn.addEventListener('click', () => {
+    if (redoStack.length === 0) return;
+    const popped = redoStack.pop();
+    drawingHistory.push(popped);
+    redrawCanvas();
+
+    broadcastPaintData({ type: 'paint-redo', stroke: popped });
+});
+
+function broadcastPaintData(data) {
+    activeDataConnections.forEach(conn => {
+        if (conn.open) {
+            conn.send(data);
+        }
+    });
+}
+
+// Работа со входом в профиль
 saveNameBtn.addEventListener('click', () => {
     const value = usernameInput.value.trim();
-    if (value.length > 0) {
-        myNickname = value;
-    }
+    if (value.length > 0) myNickname = value;
     nameSetupOverlay.style.display = 'none';
-    log(`User registered profile identity token: ${myNickname}`, "success");
+    log(`User profile identity: ${myNickname}`, "success");
+    initCanvas(); // Инициализация холста после закрытия оверлея
 });
 
 usernameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') saveNameBtn.click();
 });
 
-// Переключатель скрытия консоли логов
 toggleLogBtn.addEventListener('click', () => {
     logsVisible = !logsVisible;
     if (logsVisible) {
@@ -233,11 +395,6 @@ const peerConfig = {
                 urls: 'turn:openwebrtc.blockcv.com:3478?transport=udp',
                 username: 'openwebrtc',
                 credential: 'openwebrtcpassword'
-            },
-            {
-                urls: 'turn:turn.matrix.org:3478?transport=udp',
-                username: 'guest',
-                credential: 'somepassword'
             }
         ],
         iceCandidatePoolSize: 10,
@@ -248,29 +405,17 @@ const peerConfig = {
 joinBtn.addEventListener('click', async () => {
     joinBtn.disabled = true;
     statusText.innerText = translations[currentLang].statusMicRequest;
-    log("Requesting local media hardware...");
     
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ 
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, 
             video: false 
         });
-        log("Local microphone initialized successfully.", "success");
         statusText.innerText = translations[currentLang].statusNetConnect;
-        
         muteBtn.style.display = 'block';
-        
         tryToConnectAsHost();
-
     } catch (err) {
         log(`${err.name}: ${err.message}`, "error");
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-            statusText.innerText = translations[currentLang].errPermission;
-        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-            statusText.innerText = translations[currentLang].errDevice;
-        } else {
-            statusText.innerText = translations[currentLang].micNeeded;
-        }
         joinBtn.disabled = false;
     }
 });
@@ -278,63 +423,36 @@ joinBtn.addEventListener('click', async () => {
 muteBtn.addEventListener('click', () => {
     if (!localStream) return;
     isMuted = !isMuted;
-    
-    localStream.getAudioTracks().forEach(track => {
-        track.enabled = !isMuted;
-    });
+    localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
     
     if (isMuted) {
         muteBtn.classList.add('muted');
         muteBtn.innerText = translations[currentLang].btnUnmute;
-        log("Local microphone hardware MUTED by user.", "error");
     } else {
         muteBtn.classList.remove('muted');
         muteBtn.innerText = translations[currentLang].btnMute;
-        log("Local microphone input ACTIVE.", "success");
     }
 });
 
 function tryToConnectAsHost() {
-    log(`Initializing Peer connection instance as Master Host [ID: ${ROOM_ID}]...`);
     peer = new Peer(ROOM_ID, peerConfig);
-    
     peer.on('open', (id) => {
-        log(`Room session allocation success. Server ID registered: ${id}`, "success");
         statusText.innerText = translations[currentLang].statusHostWait;
         listenForCalls();
         listenForDataConnections();
     });
-
     peer.on('error', (err) => {
-        log(`PeerJS Event Error triggered. Type code: ${err.type}`, "error");
-        if (err.type === 'unavailable-id') {
-            log("Room ID token is already allocated by another peer instance. Switching to Client routing.");
-            connectAsGuest();
-        } else {
-            log(`Critical Peer internal infrastructure fault: ${err.message}`, "error");
-        }
+        if (err.type === 'unavailable-id') connectAsGuest();
     });
 }
 
 function connectAsGuest() {
-    log(`Initializing Peer connection instance as Client Guest [ID: ${MY_GUEST_ID}]...`);
     peer = new Peer(MY_GUEST_ID, peerConfig);
-    
     peer.on('open', (id) => {
-        log(`Client session allocation success. Assigned unique network ID: ${id}`, "success");
         statusText.innerText = translations[currentLang].statusGuestConnect;
-        
         makeGuestCall();
         listenForCalls();
         listenForDataConnections();
-    });
-
-    peer.on('error', (err) => {
-        log(`Guest node fatal runtime failure instance: ${err.type} | ${err.message}`, "error");
-        if (err.type === 'peer-unavailable') {
-            log("Target Master Host is currently offline. Retrying handshake shortly...", "error");
-            startReconnectionLoop(null);
-        }
     });
 }
 
@@ -343,42 +461,27 @@ function makeGuestCall() {
         clearInterval(reconnectInterval);
         reconnectInterval = null;
     }
-
-    log(`Dispatching P2P WebRTC connection offer handshake call to Master Room target...`);
-    
     if (peer && !peer.destroyed) {
         const call = peer.call(ROOM_ID, localStream);
-        if (call) {
-            bindCallEvents(call);
-        }
-        // Инициализация дата-канала для Текстового чата
-        log(`Opening discrete data pipeline thread to Master Host...`);
+        if (call) bindCallEvents(call);
+        
         const dataConn = peer.connect(ROOM_ID);
-        if (dataConn) {
-            bindDataConnectionEvents(dataConn);
-        }
+        if (dataConn) bindDataConnectionEvents(dataConn);
     } else {
-        log("Peer instance is dead or destroyed. Initiating full guest node reset...");
         connectAsGuest();
     }
 }
 
 function listenForCalls() {
     peer.on('call', (call) => {
-        if (connectedPeers.has(call.peer)) {
-            log(`Prevented redundant network thread loop duplication from node: ${call.peer}`);
-            return;
-        }
-        log(`Inbound P2P signaling session call packet received from remote node: ${call.peer}`, "success");
+        if (connectedPeers.has(call.peer)) return;
         call.answer(localStream);
         bindCallEvents(call);
     });
 }
 
-// Прослушивание входящих текстовых каналов (для Хоста)
 function listenForDataConnections() {
     peer.on('connection', (dataConn) => {
-        log(`Inbound P2P layout data channel synchronized from node: ${dataConn.peer}`, "success");
         bindDataConnectionEvents(dataConn);
     });
 }
@@ -387,89 +490,83 @@ function bindCallEvents(call) {
     if (call.peerConnection) {
         call.peerConnection.addEventListener('iceconnectionstatechange', () => {
             const state = call.peerConnection.iceConnectionState;
-            log(`WebRTC ICE Core Layer Network State Changed: ${state}`);
-            
             if (state === 'connected') {
                 if (reconnectInterval) {
                     clearInterval(reconnectInterval);
                     reconnectInterval = null;
-                    log("Active reconnection timers cleared. Channel stable.", "success");
                 }
-                log(`Direct P2P socket pipeline verified between routers. Waiting for stream data packets...`, "success");
-                chatContainer.style.display = 'block'; // Показываем чат при успешном коннекте
+                chatContainer.style.display = 'block';
+                paintContainer.style.display = 'block'; // Разворачиваем холст
+                
+                // Передаем текущую картину новому пользователю, если мы Хост и уже что-то нарисовали
+                if (drawingHistory.length > 0) {
+                    broadcastPaintData({
+                        type: 'paint-sync-canvas',
+                        history: drawingHistory
+                    });
+                }
             }
-            
-            if (state === 'disconnected' || state === 'failed') {
-                log("Network disruption detected. Activating background auto-reconnect pipeline...", "error");
-                startReconnectionLoop(call);
-            }
+            if (state === 'disconnected' || state === 'failed') startReconnectionLoop(call);
         });
     }
-
-    call.on('stream', (remoteStream) => {
-        log(`Inbound audio media processing framework initialized. Stream detected.`, "success");
-        addAudioStream(call.peer, remoteStream);
-    });
-
-    call.on('close', () => {
-        log("Call instance closed by remote peer. Initiating connection recovery...", "error");
-        startReconnectionLoop(call);
-    });
-
-    call.on('error', (err) => {
-        log(`Call session pipe crushed down mid-execution: ${err.message}`, "error");
-        startReconnectionLoop(call);
-    });
+    call.on('stream', (remoteStream) => addAudioStream(call.peer, remoteStream));
+    call.on('close', () => startReconnectionLoop(call));
 }
 
-// Логика работы P2P дата-канала чата
 function bindDataConnectionEvents(dataConn) {
     dataConn.on('open', () => {
         activeDataConnections.add(dataConn);
-        // Отправляем пакет системного интро, чтобы передать наше имя собеседнику
-        dataConn.send({
-            type: 'system-intro',
-            name: myNickname
-        });
+        dataConn.send({ type: 'system-intro', name: myNickname });
     });
 
     dataConn.on('data', (data) => {
         if (!data || typeof data !== 'object') return;
 
+        // Обработка текстовых данных чата
         if (data.type === 'system-intro') {
             appendChatMessage(translations[currentLang].systemLabel, `${data.name} ${translations[currentLang].joinedChat}`, '#f5c2e7', true);
         } else if (data.type === 'text-message') {
             appendChatMessage(data.sender, data.text, '#b4befe', false);
         }
+        
+        // Обработка сетевых пакетов рисования
+        else if (data.type === 'paint-live-draw') {
+            ctx.beginPath();
+            ctx.strokeStyle = convertHexToRGBA(data.color, data.opacity);
+            ctx.lineWidth = data.size;
+            ctx.moveTo(data.from.x, data.from.y);
+            ctx.lineTo(data.to.x, data.to.y);
+            ctx.stroke();
+        } else if (data.type === 'paint-commit-stroke') {
+            drawingHistory.push(data.stroke);
+            redoStack = []; 
+        } else if (data.type === 'paint-undo') {
+            if (drawingHistory.length > 0) {
+                redoStack.push(drawingHistory.pop());
+                redrawCanvas();
+            }
+        } else if (data.type === 'paint-redo') {
+            drawingHistory.push(data.stroke);
+            redrawCanvas();
+        } else if (data.type === 'paint-sync-canvas') {
+            drawingHistory = data.history;
+            redrawCanvas();
+        }
     });
 
-    dataConn.on('close', () => {
-        activeDataConnections.delete(dataConn);
-        log(`Data pipeline socket closed down from node context: ${dataConn.peer}`, "error");
-    });
-
-    dataConn.on('error', (err) => {
-        log(`Data channel operation process error: ${err.message}`, "error");
-    });
+    dataConn.on('close', () => activeDataConnections.delete(dataConn));
 }
 
-// Функция отправки текстового сообщения
 function sendTextMessage() {
     const text = chatInput.value.trim();
     if (text.length === 0) return;
 
-    // Вывод своего сообщения на свой экран
     appendChatMessage(myNickname, text, '#a6e3a1', false);
     chatInput.value = '';
 
-    // Передача пакета во все активные соединения WebRTC
     activeDataConnections.forEach(conn => {
         if (conn.open) {
-            conn.send({
-                type: 'text-message',
-                sender: myNickname,
-                text: text
-            });
+            conn.send({ type: 'text-message', sender: myNickname, text: text });
         }
     });
 }
@@ -479,7 +576,6 @@ chatInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendTextMessage();
 });
 
-// Рендеринг строк внутри чата
 function appendChatMessage(sender, text, nameColor = '#a6e3a1', isSystem = false) {
     const msgElement = document.createElement('div');
     if (isSystem) {
@@ -496,23 +592,17 @@ function escapeHTML(str) {
 }
 
 function startReconnectionLoop(currentCall) {
-    if (currentCall) {
-        currentCall.close();
-    }
-    
+    if (currentCall) currentCall.close();
     connectedPeers.delete(ROOM_ID);
-    chatContainer.style.display = 'none'; // Скрываем чат при потере связи
+    chatContainer.style.display = 'none';
+    paintContainer.style.display = 'none'; // Прячем холст при обрыве связи
     
     const oldAudio = document.getElementById(`audio-${ROOM_ID}`);
     if (oldAudio) oldAudio.remove();
-
     if (reconnectInterval) return; 
 
     statusText.innerText = translations[currentLang].statusReconnecting;
-    log("Reconnection loop engaged. Retrying every 4 seconds...");
-    
     reconnectInterval = setInterval(() => {
-        log("Attempting P2P socket handshake recovery...");
         makeGuestCall();
     }, 4000);
 }
@@ -521,11 +611,9 @@ function addAudioStream(peerId, stream) {
     if (connectedPeers.has(peerId)) return;
     connectedPeers.add(peerId);
 
-    log(`Assembling DOM layer hardware wrappers for audio node renderer...`);
     const audio = document.createElement('audio');
     audio.id = `audio-${peerId}`;
     audio.srcObject = stream;
-    
     audio.setAttribute('playsinline', 'true');
     audio.setAttribute('autoplay', 'true');
     audio.autoplay = true;
@@ -534,33 +622,21 @@ function addAudioStream(peerId, stream) {
     activeAudioElements.push(audio);
     
     audio.play()
-        .then(() => {
-            log(`Remote sound track codec unpacked and processing pipeline output is active.`, "success");
-            statusText.innerText = translations[currentLang].statusConnected;
-        })
-        .catch(e => {
-            log(`Autoplay policy violation. Audio track renderer stalled. Raising manual override overlay UI window.`, "error");
-            overlay.style.display = 'flex';
-        });
+        .then(() => statusText.innerText = translations[currentLang].statusConnected)
+        .catch(e => overlay.style.display = 'flex');
 }
 
 modalBtn.addEventListener('click', () => {
-    log("User interaction acknowledged. Executing forced playback pipeline refresh...");
     overlay.style.display = 'none';
-    
     activeAudioElements.forEach(audio => {
         audio.play()
-            .then(() => {
-                log("Forced hardware playback execution resolved successfully.", "success");
-                statusText.innerText = translations[currentLang].statusConnected;
-            })
-            .catch(err => log(`Forced execution fallback crashed: ${err.message}`, "error"));
+            .then(() => statusText.innerText = translations[currentLang].statusConnected)
+            .catch(err => console.log(err));
     });
 });
 
 copyLogBtn.addEventListener('click', () => {
     const textToCopy = logDiv.innerText || logDiv.textContent;
-    
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(textToCopy)
             .then(() => showCopiedFeedback())
@@ -577,22 +653,19 @@ function fallbackCopyText(text) {
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    
     try {
         document.execCommand('copy');
         showCopiedFeedback();
     } catch (err) {
-        console.error('Fallback copy method failed', err);
+        console.error(err);
     }
     document.body.removeChild(textArea);
 }
 
 function showCopiedFeedback() {
-    const originalText = copyLogBtn.innerText;
     copyLogBtn.innerText = translations[currentLang].btnCopied;
     copyLogBtn.style.borderColor = '#a6e3a1';
     copyLogBtn.style.color = '#a6e3a1';
-    
     setTimeout(() => {
         copyLogBtn.innerText = translations[currentLang].btnCopy;
         copyLogBtn.style.borderColor = '#45475a';
