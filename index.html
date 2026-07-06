@@ -57,21 +57,42 @@
             color: #a6e3a1;
             margin-bottom: 20px;
         }
+
+        .setup-row {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nickname-input {
+            background: #313244;
+            border: 1px solid #45475a;
+            color: #cdd6f4;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+        .nickname-input:disabled {
+            background: #11111b;
+            color: #585b70;
+            border-color: #313244;
+        }
         
-        /* Кнопки управления главным экраном */
-        .main-btn, .mute-btn, .cam-btn, .toggle-log-btn {
+        .main-btn, .mute-btn, .cam-btn, .switch-cam-btn, .toggle-log-btn {
             background: #cba6f7;
             color: #11111b;
             border: none;
             padding: 12px 24px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
-            margin: 10px;
             display: inline-block;
-            width: auto;
         }
         .main-btn:hover { background: #f5c2e7; }
         .main-btn:disabled { background: #585b70; cursor: not-allowed; color: #a6adc8; }
@@ -83,10 +104,12 @@
         .cam-btn { background: #89b4fa; }
         .cam-btn:hover { background: #b4befe; }
         .cam-btn.off { background: #f38ba8; }
+
+        .switch-cam-btn { background: #94e2d5; }
+        .switch-cam-btn:hover { background: #81c8be; }
         
         .status { margin: 15px 0; font-style: italic; color: #bac2de; font-size: 14px; }
         
-        /* Сетка видеопотоков WebRTC */
         .video-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -108,7 +131,6 @@
         }
         .video-wrapper.my-video { border-color: #cba6f7; }
         
-        /* Эффект фиолетового свечения вокруг камеры говорящего */
         .video-wrapper.speaking {
             border-color: #cba6f7 !important;
             box-shadow: 0 0 18px rgba(203, 166, 247, 0.85);
@@ -120,7 +142,6 @@
             object-fit: cover;
         }
         
-        /* Компактная плашка имени пользователя поверх видео */
         .video-label {
             position: absolute;
             bottom: 10px;
@@ -142,7 +163,6 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        /* Индикатор перечеркнутого микрофона */
         .mic-status-icon {
             position: absolute;
             top: 10px;
@@ -152,7 +172,7 @@
             width: 26px;
             height: 26px;
             border-radius: 50%;
-            display: none; /* по умолчанию скрыт */
+            display: none;
             align-items: center;
             justify-content: center;
             font-size: 14px;
@@ -162,7 +182,6 @@
             pointer-events: none;
         }
         
-        /* Интерфейс Текстового Чата */
         .chat-container {
             display: none;
             flex-direction: column;
@@ -215,14 +234,11 @@
             transition: background 0.2s !important;
             width: auto !important;
             min-width: 80px !important;
-            max-width: 120px !important;
             height: 38px !important;
             margin: 0 !important;
-            display: inline-block !important;
         }
         .chat-input-row .chat-send-btn:hover { background: #b4befe !important; }
         
-        /* Секция холста рисования */
         .paint-container {
             display: none;
             background: #11111b;
@@ -272,7 +288,6 @@
             margin: 0 2px !important;
             width: auto !important;
             display: inline-block !important;
-            font-weight: normal !important;
         }
         .history-btn:hover { background: #45475a !important; color: #f5e0dc !important; }
         .history-btn.clear-btn { background: rgba(243, 139, 168, 0.15) !important; border-color: #f38ba8 !important; color: #f38ba8 !important; }
@@ -288,8 +303,7 @@
             touch-action: none;
         }
         
-        /* Окно логов консоли */
-        .toggle-log-btn { background: #6c7086; color: #cdd6f4; font-size: 13px; padding: 8px 16px; }
+        .toggle-log-btn { background: #6c7086; color: #cdd6f4; font-size: 13px; padding: 8px 16px; margin-top: 15px;}
         .toggle-log-btn:hover { background: #a6adc8; color: #11111b; }
         .log-section { display: none; width: 100%; text-align: left; margin-top: 15px; box-sizing: border-box; }
         .log-window {
@@ -315,11 +329,9 @@
             border-radius: 4px;
             font-size: 12px;
             display: inline-block;
-            width: auto;
         }
         .copy-btn:hover { background: #45475a; }
         
-        /* Системный оверлей активации аудио */
         .audio-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(17,17,27,0.85); display: none; align-items: center; justify-content: center; z-index: 9999;
@@ -352,13 +364,15 @@
     <h1 id="txt-title">Global Video & Paint Chat</h1>
     <div class="room-badge" id="txt-badge">Room: World Wide Grid</div>
     
-    <div>
-        <button id="joinBtn" class="main-btn" disabled>Join Room</button>
+    <div class="setup-row">
+        <input type="text" id="nicknameInput" class="nickname-input" placeholder="Your nickname..." maxlength="25">
+        <button id="joinBtn" class="main-btn">Join Room</button>
         <button id="muteBtn" class="mute-btn" style="display:none;">Mute Mic</button>
         <button id="camBtn" class="cam-btn" style="display:none;">Stop Cam</button>
+        <button id="switchCamBtn" class="switch-cam-btn" style="display:none;">🔄 Switch Cam</button>
     </div>
     
-    <div class="status" id="statusText">Requesting 720p HD stream...</div>
+    <div class="status" id="statusText">Click button to connect...</div>
     
     <div id="videoGrid" class="video-grid"></div>
     
