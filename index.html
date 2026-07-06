@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Audio, Video & Paint Room</title>
+    <title>Global Audio, Video & Paint Group Room</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -16,347 +16,481 @@
             min-height: 100vh;
             margin: 0;
             padding: 20px;
+            box-sizing: border-box;
         }
         .card {
             background: #1e1e2e;
             padding: 30px;
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            max-width: 500px;
+            max-width: 950px;
             width: 100%;
             text-align: center;
             border: 1px solid #313244;
             position: relative;
+            box-sizing: border-box;
         }
         .lang-switcher {
             position: absolute;
             top: 15px;
             right: 15px;
+            display: flex;
+            gap: 8px;
         }
         .lang-btn {
             background: #313244;
             color: #cdd6f4;
             border: 1px solid #45475a;
-            padding: 4px 8px;
+            padding: 5px 10px;
+            border-radius: 6px;
             cursor: pointer;
-            border-radius: 4px;
             font-size: 12px;
-            margin-left: 2px;
             font-weight: bold;
+            transition: all 0.2s ease;
         }
         .lang-btn.active {
-            background: #f5c2e7;
+            background: #cba6f7;
             color: #11111b;
-            border-color: #f5c2e7;
+            border-color: #cba6f7;
         }
-        h1 { margin-top: 15px; color: #a6e3a1; font-size: 24px; }
+        h1 {
+            color: #cba6f7;
+            margin-bottom: 5px;
+            font-size: 28px;
+        }
         .room-badge {
             background: #313244;
-            color: #f5c2e7;
-            padding: 5px 12px;
+            color: #f5e0dc;
+            padding: 6px 14px;
             border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 13px;
             display: inline-block;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            font-weight: 600;
+            border: 1px solid #45475a;
         }
-        button.main-btn {
-            background: #a6e3a1;
-            color: #11111b;
-            border: none;
-            padding: 14px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            transition: transform 0.1s, background 0.2s;
-        }
-        button.main-btn:hover { background: #94e2d5; }
-        button.main-btn:active { transform: scale(0.98); }
-        button.main-btn:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; }
-        
-        .media-controls {
+        .setup-row {
             display: flex;
-            gap: 10px;
-            margin-top: 12px;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
         }
-        .media-btn {
-            display: none;
-            flex: 1;
-            background: #f9e2af;
+        .input-field {
+            background: #313244;
+            border: 1px solid #45475a;
+            color: #cdd6f4;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            width: 220px;
+            transition: border-color 0.2s;
+        }
+        .input-field:focus {
+            border-color: #cba6f7;
+        }
+        .join-btn {
+            background: linear-gradient(135deg, #cba6f7 0%, #89b4fa 100%);
             color: #11111b;
             border: none;
-            padding: 12px 10px;
-            font-size: 14px;
+            padding: 12px 28px;
+            font-size: 15px;
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
-            transition: transform 0.1s, background 0.2s;
+            transition: transform 0.1s, opacity 0.2s;
         }
-        .media-btn:active { transform: scale(0.98); }
-        .media-btn.muted { background: #f38ba8; }
-        #flipCamBtn { background: #89b4fa; color: #11111b; }
-
-        .status {
+        .join-btn:hover {
+            opacity: 0.9;
+        }
+        .join-btn:active {
+            transform: scale(0.98);
+        }
+        .control-btn {
+            background: #313244;
+            color: #cdd6f4;
+            border: 1px solid #45475a;
+            padding: 12px 20px;
             font-size: 15px;
-            color: #bac2de;
-            margin: 20px 0;
-            min-height: 22px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+            margin: 0 5px;
+            transition: all 0.2s;
+        }
+        .control-btn:hover {
+            background: #45475a;
+        }
+        .control-btn.active-state {
+            background: #f38ba8 !important;
+            color: #11111b !important;
+            border-color: #f38ba8 !important;
+        }
+        .status-text {
+            margin: 15px 0;
+            font-size: 14px;
+            color: #a6adc8;
+            font-style: italic;
+            min-height: 20px;
+        }
+        
+        /* Панель Администратора */
+        .host-panel {
+            display: none;
+            background: #1e1e2e;
+            border: 2px solid #f38ba8;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px auto;
+            text-align: left;
+            max-width: 900px;
+            box-sizing: border-box;
+        }
+        .host-panel h3 {
+            color: #f38ba8;
+            margin-top: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+        }
+        .host-refresh-btn {
+            background: #89b4fa;
+            color: #11111b;
+            border: none;
+            padding: 6px 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .host-user-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 160px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .host-user-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #11111b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #313244;
+        }
+        .host-kick-btn {
+            background: #f38ba8;
+            color: #11111b;
+            border: none;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
-        /* Видео контейнеры */
         .video-grid {
-            display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
+            margin-top: 25px;
         }
-        .video-box {
+        .video-wrapper {
             background: #11111b;
-            border: 1px solid #313244;
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            aspect-ratio: 4/3;
             position: relative;
+            aspect-ratio: 4/3;
+            border: 2px solid #313244;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            transition: border-color 0.3s ease;
         }
-        .video-box video {
+        .video-wrapper.speaking {
+            border-color: #a6e3a1 !important;
+            box-shadow: 0 0 12px rgba(166, 227, 161, 0.4);
+        }
+        .video-wrapper video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-        }
-        .video-box.local video {
-            transform: scaleX(-1); /* Зеркалим локальную вебку */
+            background: #000;
         }
         .video-label {
             position: absolute;
-            bottom: 5px;
-            left: 5px;
-            background: rgba(17, 17, 27, 0.7);
-            color: #cdd6f4;
-            padding: 2px 6px;
-            font-size: 11px;
-            border-radius: 4px;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(17, 17, 27, 0.75);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            max-width: 80%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border: 1px solid rgba(255,255,255,0.05);
         }
-
-        /* Стили текстового чата */
+        .my-video {
+            border-color: #cba6f7;
+        }
+        .my-video .video-label {
+            color: #cba6f7;
+        }
+        
         .chat-container {
-            display: none;
-            margin-top: 15px;
-            border: 1px solid #313244;
-            border-radius: 8px;
             background: #11111b;
-            padding: 12px;
+            border: 1px solid #313244;
+            border-radius: 12px;
+            margin-top: 25px;
+            display: none;
+            flex-direction: column;
             text-align: left;
+            height: 250px;
+            box-sizing: border-box;
         }
         .chat-messages {
-            height: 120px;
+            flex: 1;
+            padding: 12px;
             overflow-y: auto;
-            font-size: 13px;
-            color: #cdd6f4;
-            margin-bottom: 10px;
+            font-size: 14px;
             display: flex;
             flex-direction: column;
             gap: 6px;
-            white-space: pre-wrap;
+        }
+        .chat-msg-item {
+            line-height: 1.4;
             word-break: break-word;
         }
-        .chat-input-row { display: flex; gap: 8px; }
-        .chat-input-row input {
-            flex: 1; padding: 8px 12px; border-radius: 6px;
-            border: 1px solid #45475a; background: #1e1e2e;
-            color: #cdd6f4; font-size: 13px;
+        .chat-input-row {
+            display: flex;
+            border-top: 1px solid #313244;
+            padding: 8px;
+            gap: 8px;
         }
-        .chat-input-row input:focus { outline: none; border-color: #f5c2e7; }
+        #chatInput {
+            flex: 1;
+            background: #313244;
+            border: 1px solid #45475a;
+            color: #cdd6f4;
+            padding: 8px 12px;
+            border-radius: 6px;
+            outline: none;
+            font-size: 14px;
+        }
         .chat-send-btn {
-            background: #f5c2e7; color: #11111b; border: none;
-            padding: 0 16px; border-radius: 6px; font-weight: bold;
-            cursor: pointer; transition: background 0.2s;
+            background: #cba6f7;
+            color: #11111b;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
         }
-        .chat-send-btn:hover { background: #eba0b8; }
 
-        /* Секция совместного рисования */
         .paint-container {
-            display: none;
-            margin-top: 15px;
-            border: 1px solid #313244;
-            border-radius: 8px;
             background: #11111b;
+            border: 1px solid #313244;
+            border-radius: 12px;
+            margin-top: 25px;
             padding: 12px;
+            display: none;
         }
         .paint-toolbar {
             display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
             margin-bottom: 10px;
-            background: #1e1e2e;
-            padding: 8px;
-            border-radius: 6px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .tool-group {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: #bac2de;
-        }
-        .tool-group input[type="color"] {
-            border: none;
-            width: 28px;
-            height: 28px;
-            border-radius: 4px;
-            cursor: pointer;
-            background: transparent;
-        }
-        .tool-group input[type="range"] {
-            width: 60px;
-            cursor: pointer;
+            gap: 8px;
         }
         .history-btn {
             background: #313244;
             color: #cdd6f4;
             border: 1px solid #45475a;
-            padding: 4px 6px;
-            font-size: 12px;
-            border-radius: 4px;
+            padding: 6px 12px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
         }
-        .history-btn:hover { background: #45475a; }
-        .history-btn.clear-btn { background: #f38ba8; color: #11111b; border-color: #f38ba8; }
-        .history-btn.clear-btn:hover { background: #eba0b8; }
-        
-        #paintCanvas {
-            background: #ffffff;
-            border-radius: 6px;
+        .clear-btn {
+            background: #f38ba8;
+            color: #11111b;
+            border: none;
+        }
+        canvas {
+            background: #1e1e2e;
+            border: 1px solid #313244;
+            border-radius: 8px;
             cursor: crosshair;
-            display: block;
-            touch-action: none;
             width: 100%;
             height: auto;
+            max-width: 100%;
+            display: block;
+            touch-action: none;
         }
 
-        /* Консоль логов */
-        .log-container { display: none; margin-top: 15px; text-align: right; }
-        .copy-btn, .toggle-log-btn {
-            background: #313244; color: #f5e0dc; border: 1px solid #45475a;
-            padding: 6px 12px; font-size: 12px; border-radius: 6px;
-            cursor: pointer; margin-bottom: 6px; font-weight: 500;
+        .toggle-log-btn {
+            background: #313244;
+            color: #a6adc8;
+            border: 1px solid #45475a;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 30px;
+            font-size: 13px;
         }
-        .toggle-log-btn { width: 100%; margin-top: 12px; padding: 10px; font-size: 13px; }
-        #log {
-            background: #11111b; padding: 12px; border-radius: 8px;
-            height: 150px; overflow-y: auto; font-size: 11px;
-            text-align: left; color: #f5e0dc; font-family: monospace;
-            border: 1px solid #313244; white-space: pre-wrap; word-break: break-all;
+        .log-section {
+            background: #11111b;
+            border: 1px solid #313244;
+            border-radius: 12px;
+            width: 100%;
+            margin-top: 15px;
+            padding: 15px;
+            box-sizing: border-box;
+            display: none;
+            text-align: left;
         }
-        
-        .audio-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(17, 17, 27, 0.9); backdrop-filter: blur(6px);
-            z-index: 9999; justify-content: center; align-items: center;
+        .log-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
         }
-        .audio-modal {
-            background: #313244; padding: 25px 35px; border-radius: 12px;
-            border: 2px solid #f5c2e7; text-align: center; max-width: 320px; width: 100%;
+        .copy-log-btn {
+            background: #89b4fa;
+            color: #11111b;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
         }
-        .audio-modal p { margin: 0 0 15px 0; font-size: 16px; color: #cdd6f4; }
-        .audio-modal input.name-input {
-            width: 90%; padding: 10px; border-radius: 6px; border: 1px solid #45475a;
-            background: #1e1e2e; color: #cdd6f4; margin-bottom: 15px; text-align: center; font-size: 16px;
+        .log-output {
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            color: #a6e3a1;
+            line-height: 1.5;
         }
-        .audio-modal button {
-            background: #f5c2e7; color: #11111b; border: none;
-            padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%;
+        .log-line {
+            margin: 2px 0;
         }
-        #remoteMediaContainer { display: none; }
+        .log-error { color: #f38ba8; }
+        .log-warn { color: #f9e2af; }
+
+        .audio-blocker-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(17,17,27,0.95);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .audio-blocker-btn {
+            background: #a6e3a1;
+            color: #11111b;
+            border: none;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 20px rgba(166,227,161,0.3);
+        }
     </style>
 </head>
 <body>
 
-<div id="nameSetupOverlay" class="audio-overlay" style="display: flex;">
-    <div class="audio-modal">
-        <p id="txt-name-prompt">Enter your nickname to start:</p>
-        <input type="text" id="usernameInput" class="name-input" maxlength="20" placeholder="Your name...">
-        <button id="saveNameBtn">Confirm</button>
-    </div>
-</div>
-
-<div id="audioActivationOverlay" class="audio-overlay">
-    <div class="audio-modal">
-        <p id="txt-modal-alert">Your browser blocked background audio. Click to activate stream.</p>
-        <button id="audioActivateBtn">Unmute Audio</button>
-    </div>
-</div>
-
-<div class="card">
     <div class="lang-switcher">
-        <button class="lang-btn" id="btn-en" onclick="changeLanguage('en')">EN</button>
-        <button class="lang-btn" id="btn-uk" onclick="changeLanguage('uk')">UK</button>
-        <button class="lang-btn" id="btn-ru" onclick="changeLanguage('ru')">RU</button>
+        <button class="lang-btn active" id="langEn">EN</button>
+        <button class="lang-btn" id="langUa">UA</button>
+        <button class="lang-btn" id="langRu">RU</button>
     </div>
 
-    <h1 id="txt-title">Global HD Video Chat</h1>
-    <div class="room-badge" id="txt-badge">Room: World Wide</div>
-    
-    <button id="joinBtn" class="main-btn">Join Room</button>
-    
-    <div class="media-controls">
-        <button id="muteBtn" class="media-btn">Mute Mic</button>
-        <button id="flipCamBtn" class="media-btn">Flip Cam</button>
-    </div>
-    
-    <div class="status" id="statusText">Click button to connect...</div>
+    <div class="card">
+        <h1 id="mainTitle">Global Video & Paint Chat</h1>
+        <div class="room-badge" id="roomBadge">Room: World Wide Grid</div>
 
-    <div id="videoGrid" class="video-grid">
-        <div class="video-box local">
-            <video id="localVideo" autoplay playsinline muted></video>
-            <div class="video-label" id="lbl-me">You</div>
+        <div class="setup-row">
+            <input type="text" id="nicknameInput" class="input-field" placeholder="Your Nickname..." maxlength="20">
+            <button id="joinBtn" class="join-btn">Join Room</button>
+            
+            <button id="muteBtn" class="control-btn">Mute Mic</button>
+            <button id="camBtn" class="control-btn">Turn Off Cam</button>
+            <button id="switchCamBtn" class="control-btn" style="background: #a6e3a1; color: #11111b; border: none;">🔄 Switch Camera</button>
         </div>
-        <div class="video-box" id="remoteVideoBox">
-            <video id="remoteVideo" autoplay playsinline></video>
-            <div class="video-label" id="lbl-peer">Friend</div>
-        </div>
-    </div>
-    
-    <div id="chatContainer" class="chat-container">
-        <div id="chatMessages" class="chat-messages"></div>
-        <div class="chat-input-row">
-            <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
-            <button id="sendMsgBtn" class="chat-send-btn">Send</button>
-        </div>
-    </div>
 
-    <div id="paintContainer" class="paint-container">
-        <div class="paint-toolbar">
-            <div class="tool-group">
-                <input type="color" id="brushColor" value="#1e1e2e">
-                <input type="range" id="brushSize" min="1" max="40" value="5">
-                <input type="range" id="brushOpacity" min="0.1" max="1.0" step="0.1" value="1.0">
-            </div>
-            <div class="tool-group">
-                <button id="undoBtn" class="history-btn">↶</button>
-                <button id="redoBtn" class="history-btn">↷</button>
-                <button id="clearBtn" class="history-btn clear-btn">🗑️ Clear</button>
+        <div id="statusText" class="status-text">Click button to connect...</div>
+
+        <div id="hostPanel" class="host-panel">
+            <h3>
+                👑 Room Management Panel (Host Mode)
+                <button id="refreshUsersBtn" class="host-refresh-btn">🔄 Refresh List</button>
+            </h3>
+            <div id="hostUserList" class="host-user-list"></div>
+        </div>
+
+        <div id="videoGrid" class="video-grid"></div>
+
+        <div id="chatContainer" class="chat-container">
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input-row">
+                <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
+                <button id="sendMsgBtn" class="chat-send-btn">Send</button>
             </div>
         </div>
-        <canvas id="paintCanvas" width="440" height="300"></canvas>
+
+        <div id="paintContainer" class="paint-container">
+            <div class="paint-toolbar">
+                <div class="tool-group">
+                    <input type="color" id="brushColor" value="#cba6f7">
+                    <input type="range" id="brushSize" min="1" max="40" value="5">
+                    <input type="range" id="brushOpacity" min="0.1" max="1.0" step="0.1" value="1.0">
+                </div>
+                <div class="tool-group">
+                    <button id="undoBtn" class="history-btn">↶</button>
+                    <button id="redoBtn" class="history-btn">↷</button>
+                    <button id="clearBtn" class="history-btn clear-btn">🗑️ Clear</button>
+                </div>
+            </div>
+            <canvas id="paintCanvas" width="500" height="320"></canvas>
+        </div>
     </div>
 
     <button id="toggleLogBtn" class="toggle-log-btn">Show Console Logs</button>
     
-    <div id="remoteMediaContainer"></div>
-    
-    <div id="logSection" class="log-container">
-        <button id="copyLogBtn" class="copy-btn">Copy Logs</button>
-        <div id="log">System ready.</div>
+    <div id="logSection" class="log-section">
+        <div class="log-toolbar">
+            <button id="copyLogBtn" class="copy-log-btn">Copy Logs</button>
+        </div>
+        <div id="logDiv" class="log-output"></div>
     </div>
-</div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="app.js"></script>
+    <div id="audioOverlay" class="audio-blocker-overlay">
+        <h2 id="modalText" style="color: #f38ba8; max-width: 500px;">Your browser blocked background audio. Click to activate voice stream.</h2>
+        <button id="audioOverlayBtn" class="audio-blocker-btn">Unmute Audio</button>
+    </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
