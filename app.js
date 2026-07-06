@@ -4,6 +4,7 @@ const MY_GUEST_ID = "guest-" + Math.random().toString(36).substring(2, 9);
 let peer = null;
 let localStream = null;
 let isMuted = false;
+let currentFacingMode = "user"; // "user" — фронтальная по умолчанию, "environment" — основная
 let reconnectInterval = null; 
 let myNickname = "User";
 const connectedPeers = new Set();
@@ -15,7 +16,7 @@ let canvas, ctx;
 let isDrawing = false;
 let lastX = 0;
 let lastY = 0;
-let currentStroke = []; // Хранит текущую рисуемую линию
+let currentStroke = [];
 
 // База данных истории для Undo/Redo
 let drawingHistory = []; 
@@ -23,21 +24,21 @@ let redoStack = [];
 
 const translations = {
     en: {
-        title: "Global Audio & Paint Chat",
+        title: "Global Video & Paint Chat",
         badge: "Room: World Wide",
         btnJoin: "Join Room",
         statusWait: "Click button to connect...",
-        statusMicRequest: "Requesting microphone access...",
+        statusMicRequest: "Requesting 720p stream...",
         statusNetConnect: "Connecting to international network...",
         statusHostWait: "You are Host. Waiting for friends...",
         statusGuestConnect: "Connecting to host...",
         statusConnected: "Connection established!",
         statusReconnecting: "Connection lost. Reconnecting...",
-        modalText: "Your browser blocked background audio. Click to activate voice stream.",
+        modalText: "Your browser blocked background audio. Click to activate stream.",
         modalBtn: "Unmute Audio",
-        micNeeded: "Microphone access is required!",
-        errPermission: "Error: Microphone permission denied by user.",
-        errDevice: "Error: No microphone found on this device.",
+        micNeeded: "Camera/Microphone access is required!",
+        errPermission: "Error: Permission denied by user.",
+        errDevice: "Error: Hardware media capture failed.",
         btnCopy: "Copy Logs",
         btnCopied: "Copied!",
         btnMute: "Mute Mic",
@@ -49,24 +50,27 @@ const translations = {
         btnShowLog: "Show Console Logs",
         btnHideLog: "Hide Console Logs",
         systemLabel: "System",
-        joinedChat: "joined the chat."
+        joinedChat: "joined the chat.",
+        lblMe: "You",
+        lblPeer: "Friend",
+        btnClear: "🗑️ Clear"
     },
     uk: {
-        title: "Глобальний аудіо та малювальний чат",
+        title: "Глобальний HD відео та арт-чат",
         badge: "Кімната: Світ",
         btnJoin: "Увійти в кімнату",
         statusWait: "Натисніть кнопку для підключення...",
-        statusMicRequest: "Запит дозволу на мікрофон...",
+        statusMicRequest: "Запит HD потоку 720p...",
         statusNetConnect: "Підключення до міжнародної мережі...",
         statusHostWait: "Ви Хост. Очікування друзів...",
         statusGuestConnect: "З'єднання з хостом...",
         statusConnected: "Зв'язок встановлено!",
         statusReconnecting: "Зв'язок розірвано. Перепідключення...",
-        modalText: "Браузер заблокував звук у фоні. Натисніть для активації голосового потоку.",
+        modalText: "Браузер заблокував звук у фоні. Натисніть для активації потоку.",
         modalBtn: "Увімкнути звук",
-        micNeeded: "Потрібен доступ до мікрофона!",
-        errPermission: "Помилка: Доступ до мікрофона відхилено користувачем.",
-        errDevice: "Помилка: На цьому пристрої не знайдено мікрофон.",
+        micNeeded: "Потрібен доступ до камери та мікрофона!",
+        errPermission: "Помилка: Доступ відхилено користувачем.",
+        errDevice: "Помилка: Не вдалося знайти пристрої захоплення.",
         btnCopy: "Скопіювати логи",
         btnCopied: "Скопійовано!",
         btnMute: "Вимкнути мік.",
@@ -78,24 +82,27 @@ const translations = {
         btnShowLog: "Показати консоль логів",
         btnHideLog: "Приховати консоль логів",
         systemLabel: "Система",
-        joinedChat: "приєднується до чату."
+        joinedChat: "приєднується до чату.",
+        lblMe: "Ви",
+        lblPeer: "Друг",
+        btnClear: "🗑️ Очистити"
     },
     ru: {
-        title: "Глобальный аудио и рисовальный чат",
+        title: "Глобальный HD видео и арт-чат",
         badge: "Комната: Весь мир",
         btnJoin: "Войти в комнату",
         statusWait: "Нажмите кнопку для подключения...",
-        statusMicRequest: "Запрос разрешения на микрофон...",
+        statusMicRequest: "Запрос HD потока 720p...",
         statusNetConnect: "Подключение к международной сети...",
-        statusHostWait: "Вы Хост. Ование друзей...",
+        statusHostWait: "Вы Хост. Ожидание друзей...",
         statusGuestConnect: "Соединение с хостом...",
         statusConnected: "Связь установлена!",
         statusReconnecting: "Связь разорвана. Переподключение...",
-        modalText: "Браузер заблокировал звук в фоне. Нажмите для активации голосового потока.",
+        modalText: "Браузер заблокировал звук в фоне. Нажмите для активации потока.",
         modalBtn: "Включить звук",
-        micNeeded: "Нужен доступ к микрофону!",
-        errPermission: "Ошибка: Доступ к микрофону отклонен пользователем.",
-        errDevice: "Ошибка: На этом устройстве не найден микрофон.",
+        micNeeded: "Нужен доступ к камере и микрофону!",
+        errPermission: "Ошибка: Доступ отклонен пользователем.",
+        errDevice: "Ошибка: Не найдены устройства захвата.",
         btnCopy: "Скопировать логи",
         btnCopied: "Скопировано!",
         btnMute: "Выключить мик.",
@@ -107,7 +114,10 @@ const translations = {
         btnShowLog: "Показать консоль логов",
         btnHideLog: "Скрыть консоль логов",
         systemLabel: "Система",
-        joinedChat: "присоединяется к чату."
+        joinedChat: "присоединяется к чату.",
+        lblMe: "Вы",
+        lblPeer: "Друг",
+        btnClear: "🗑️ Очистить"
     }
 };
 
@@ -116,10 +126,10 @@ let currentLang = 'en';
 // Поиск DOM элементов
 const joinBtn = document.getElementById('joinBtn');
 const muteBtn = document.getElementById('muteBtn');
+const flipCamBtn = document.getElementById('flipCamBtn');
 const statusText = document.getElementById('statusText');
 const logDiv = document.getElementById('log');
 const copyLogBtn = document.getElementById('copyLogBtn');
-const audioContainer = document.getElementById('remoteAudioContainer');
 const overlay = document.getElementById('audioActivationOverlay');
 const modalBtn = document.getElementById('audioActivateBtn');
 const modalTxt = document.getElementById('txt-modal-alert');
@@ -137,6 +147,10 @@ const sendMsgBtn = document.getElementById('sendMsgBtn');
 const toggleLogBtn = document.getElementById('toggleLogBtn');
 const logSection = document.getElementById('logSection');
 
+const videoGrid = document.getElementById('videoGrid');
+const localVideo = document.getElementById('localVideo');
+const remoteVideo = document.getElementById('remoteVideo');
+
 // Холст элементы
 const paintContainer = document.getElementById('paintContainer');
 const brushColorInput = document.getElementById('brushColor');
@@ -144,6 +158,7 @@ const brushSizeInput = document.getElementById('brushSize');
 const brushOpacityInput = document.getElementById('brushOpacity');
 const undoBtn = document.getElementById('undoBtn');
 const redoBtn = document.getElementById('redoBtn');
+const clearBtn = document.getElementById('clearBtn');
 
 let logsVisible = false;
 
@@ -174,6 +189,9 @@ function changeLanguage(lang) {
     usernameInput.placeholder = translations[lang].namePlaceholder;
     chatInput.placeholder = translations[lang].chatPlaceholder;
     sendMsgBtn.innerText = translations[lang].chatSend;
+    document.getElementById('lbl-me').innerText = translations[lang].lblMe;
+    document.getElementById('lbl-peer').innerText = translations[lang].lblPeer;
+    clearBtn.innerText = translations[lang].btnClear;
     
     if (logsVisible) {
         toggleLogBtn.innerText = translations[lang].btnHideLog;
@@ -208,13 +226,11 @@ function initCanvas() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Слушатели мыши
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing);
     canvas.addEventListener('mouseout', stopDrawing);
 
-    // Слушатели тач-скрина (смартфоны)
     canvas.addEventListener('touchstart', (e) => {
         const touch = e.touches[0];
         const mouseEvent = new MouseEvent('mousedown', {
@@ -241,7 +257,6 @@ function initCanvas() {
 
 function getCanvasCoordinates(e) {
     const rect = canvas.getBoundingClientRect();
-    // Рассчитываем точные координаты с учетом масштабирования CSS
     const x = (e.clientX - rect.left) * (canvas.width / rect.width);
     const y = (e.clientY - rect.top) * (canvas.height / rect.height);
     return { x, y };
@@ -268,7 +283,6 @@ function draw(e) {
     const x = coords.x;
     const y = coords.y;
 
-    // Отрисовка на своем экране мгновенно
     ctx.beginPath();
     ctx.strokeStyle = convertHexToRGBA(currentStroke.color, currentStroke.opacity);
     ctx.lineWidth = currentStroke.size;
@@ -280,7 +294,6 @@ function draw(e) {
     lastY = y;
     currentStroke.points.push({ x, y });
 
-    // Отправка координат в реальном времени другим
     broadcastPaintData({
         type: 'paint-live-draw',
         color: currentStroke.color,
@@ -297,7 +310,7 @@ function stopDrawing() {
     
     if (currentStroke && currentStroke.points.length > 0) {
         drawingHistory.push(currentStroke);
-        redoStack = []; // Очищаем стек вперед при новом рисовании
+        redoStack = [];
 
         broadcastPaintData({
             type: 'paint-commit-stroke',
@@ -314,7 +327,6 @@ function convertHexToRGBA(hex, opacity) {
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-// Перерисовка всего холста на основе локальной истории
 function redrawCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
@@ -332,13 +344,11 @@ function redrawCanvas() {
     });
 }
 
-// Логика кнопок Undo / Redo
 undoBtn.addEventListener('click', () => {
     if (drawingHistory.length === 0) return;
     const popped = drawingHistory.pop();
     redoStack.push(popped);
     redrawCanvas();
-
     broadcastPaintData({ type: 'paint-undo' });
 });
 
@@ -347,8 +357,16 @@ redoBtn.addEventListener('click', () => {
     const popped = redoStack.pop();
     drawingHistory.push(popped);
     redrawCanvas();
-
     broadcastPaintData({ type: 'paint-redo', stroke: popped });
+});
+
+// Кнопка полной очистки холста
+clearBtn.addEventListener('click', () => {
+    drawingHistory = [];
+    redoStack = [];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    log("Canvas cleared locally", "info");
+    broadcastPaintData({ type: 'paint-clear' });
 });
 
 function broadcastPaintData(data) {
@@ -359,13 +377,12 @@ function broadcastPaintData(data) {
     });
 }
 
-// Работа со входом в профиль
 saveNameBtn.addEventListener('click', () => {
     const value = usernameInput.value.trim();
     if (value.length > 0) myNickname = value;
     nameSetupOverlay.style.display = 'none';
-    log(`User profile identity: ${myNickname}`, "success");
-    initCanvas(); // Инициализация холста после закрытия оверлея
+    log(`User identity: ${myNickname}`, "success");
+    initCanvas();
 });
 
 usernameInput.addEventListener('keydown', (e) => {
@@ -407,12 +424,23 @@ joinBtn.addEventListener('click', async () => {
     statusText.innerText = translations[currentLang].statusMicRequest;
     
     try {
+        // Запрос медиа в качестве 720p с фронтальной камерой по умолчанию
         localStream = await navigator.mediaDevices.getUserMedia({ 
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, 
-            video: false 
+            video: { 
+                width: { ideal: 1280 }, 
+                height: { ideal: 720 }, 
+                facingMode: currentFacingMode 
+            } 
         });
+        
+        localVideo.srcObject = localStream;
+        videoGrid.style.display = 'grid';
         statusText.innerText = translations[currentLang].statusNetConnect;
+        
         muteBtn.style.display = 'block';
+        flipCamBtn.style.display = 'block';
+        
         tryToConnectAsHost();
     } catch (err) {
         log(`${err.name}: ${err.message}`, "error");
@@ -431,6 +459,51 @@ muteBtn.addEventListener('click', () => {
     } else {
         muteBtn.classList.remove('muted');
         muteBtn.innerText = translations[currentLang].btnMute;
+    }
+});
+
+// Динамическое переключение камеры (Flip Camera) без разрыва комнаты
+flipCamBtn.addEventListener('click', async () => {
+    if (!localStream) return;
+    
+    currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+    log(`Switching camera to facingMode: ${currentFacingMode}`, "info");
+
+    try {
+        // Получаем новый видеотрек
+        const tempStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }
+        });
+        
+        const newVideoTrack = tempStream.getVideoTracks()[0];
+        const oldVideoTrack = localStream.getVideoTracks()[0];
+        
+        // Заменяем трек в нашем локальном стриме
+        localStream.removeTrack(oldVideoTrack);
+        oldVideoTrack.stop();
+        localStream.addTrack(newVideoTrack);
+        
+        // Обновляем отображение локальной камеры (убираем зеркальность для задней камеры)
+        if (currentFacingMode === "environment") {
+            document.querySelector('.video-box.local').style.transform = 'none';
+            localVideo.style.transform = 'none';
+        } else {
+            localVideo.style.transform = 'scaleX(-1)';
+        }
+        localVideo.srcObject = localStream;
+
+        // Обновляем трек у всех активных Peer-соединений через replaceTrack
+        peer.connections[ROOM_ID]?.forEach(pcConnection => {
+            const senders = pcConnection.peerConnection.getSenders();
+            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+            if (videoSender) {
+                videoSender.replaceTrack(newVideoTrack);
+            }
+        });
+        
+        log("Camera flipped successfully and track replaced", "success");
+    } catch (err) {
+        log(`Failed to flip camera: ${err.message}`, "error");
     }
 });
 
@@ -496,9 +569,8 @@ function bindCallEvents(call) {
                     reconnectInterval = null;
                 }
                 chatContainer.style.display = 'block';
-                paintContainer.style.display = 'block'; // Разворачиваем холст
+                paintContainer.style.display = 'block';
                 
-                // Передаем текущую картину новому пользователю, если мы Хост и уже что-то нарисовали
                 if (drawingHistory.length > 0) {
                     broadcastPaintData({
                         type: 'paint-sync-canvas',
@@ -509,7 +581,7 @@ function bindCallEvents(call) {
             if (state === 'disconnected' || state === 'failed') startReconnectionLoop(call);
         });
     }
-    call.on('stream', (remoteStream) => addAudioStream(call.peer, remoteStream));
+    call.on('stream', (remoteStream) => addMediaStream(call.peer, remoteStream));
     call.on('close', () => startReconnectionLoop(call));
 }
 
@@ -522,14 +594,13 @@ function bindDataConnectionEvents(dataConn) {
     dataConn.on('data', (data) => {
         if (!data || typeof data !== 'object') return;
 
-        // Обработка текстовых данных чата
         if (data.type === 'system-intro') {
             appendChatMessage(translations[currentLang].systemLabel, `${data.name} ${translations[currentLang].joinedChat}`, '#f5c2e7', true);
         } else if (data.type === 'text-message') {
             appendChatMessage(data.sender, data.text, '#b4befe', false);
         }
         
-        // Обработка сетевых пакетов рисования
+        // Синхронизация холста
         else if (data.type === 'paint-live-draw') {
             ctx.beginPath();
             ctx.strokeStyle = convertHexToRGBA(data.color, data.opacity);
@@ -551,6 +622,11 @@ function bindDataConnectionEvents(dataConn) {
         } else if (data.type === 'paint-sync-canvas') {
             drawingHistory = data.history;
             redrawCanvas();
+        } else if (data.type === 'paint-clear') {
+            drawingHistory = [];
+            redoStack = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            log("Canvas cleared by remote peer", "info");
         }
     });
 
@@ -595,10 +671,9 @@ function startReconnectionLoop(currentCall) {
     if (currentCall) currentCall.close();
     connectedPeers.delete(ROOM_ID);
     chatContainer.style.display = 'none';
-    paintContainer.style.display = 'none'; // Прячем холст при обрыве связи
+    paintContainer.style.display = 'none';
+    videoGrid.style.display = 'none';
     
-    const oldAudio = document.getElementById(`audio-${ROOM_ID}`);
-    if (oldAudio) oldAudio.remove();
     if (reconnectInterval) return; 
 
     statusText.innerText = translations[currentLang].statusReconnecting;
@@ -607,32 +682,24 @@ function startReconnectionLoop(currentCall) {
     }, 4000);
 }
 
-function addAudioStream(peerId, stream) {
+function addMediaStream(peerId, stream) {
     if (connectedPeers.has(peerId)) return;
     connectedPeers.add(peerId);
 
-    const audio = document.createElement('audio');
-    audio.id = `audio-${peerId}`;
-    audio.srcObject = stream;
-    audio.setAttribute('playsinline', 'true');
-    audio.setAttribute('autoplay', 'true');
-    audio.autoplay = true;
+    remoteVideo.srcObject = stream;
     
-    audioContainer.appendChild(audio);
-    activeAudioElements.push(audio);
-    
-    audio.play()
+    remoteVideo.play()
         .then(() => statusText.innerText = translations[currentLang].statusConnected)
-        .catch(e => overlay.style.display = 'flex');
+        .catch(e => {
+            overlay.style.display = 'flex';
+        });
 }
 
 modalBtn.addEventListener('click', () => {
     overlay.style.display = 'none';
-    activeAudioElements.forEach(audio => {
-        audio.play()
-            .then(() => statusText.innerText = translations[currentLang].statusConnected)
-            .catch(err => console.log(err));
-    });
+    remoteVideo.play()
+        .then(() => statusText.innerText = translations[currentLang].statusConnected)
+        .catch(err => console.log(err));
 });
 
 copyLogBtn.addEventListener('click', () => {
