@@ -4,9 +4,11 @@ const MY_GUEST_ID = "guest-" + Math.random().toString(36).substring(2, 9);
 let peer = null;
 let localStream = null;
 let isMuted = false;
-let reconnectInterval = null; // Интервал для фонового автоподключения гостя
+let reconnectInterval = null; 
+let myNickname = "User";
 const connectedPeers = new Set();
 const activeAudioElements = [];
+const activeDataConnections = new Set(); // Хранение каналов данных чата
 
 const translations = {
     en: {
@@ -28,7 +30,15 @@ const translations = {
         btnCopy: "Copy Logs",
         btnCopied: "Copied!",
         btnMute: "Mute Mic",
-        btnUnmute: "Unmute Mic"
+        btnUnmute: "Unmute Mic",
+        namePrompt: "Enter your nickname to start:",
+        namePlaceholder: "Your name...",
+        chatPlaceholder: "Type a message...",
+        chatSend: "Send",
+        btnShowLog: "Show Console Logs",
+        btnHideLog: "Hide Console Logs",
+        systemLabel: "System",
+        joinedChat: "joined the chat."
     },
     uk: {
         title: "Глобальний аудіочат",
@@ -49,7 +59,15 @@ const translations = {
         btnCopy: "Скопіювати логи",
         btnCopied: "Скопійовано!",
         btnMute: "Вимкнути мік.",
-        btnUnmute: "Увімкнути мік."
+        btnUnmute: "Увімкнути мік." ,
+        namePrompt: "Введіть ваше ім'я для старту:",
+        namePlaceholder: "Ваше ім'я...",
+        chatPlaceholder: "Напишіть повідомлення...",
+        chatSend: "Надісл.",
+        btnShowLog: "Показати консоль логів",
+        btnHideLog: "Приховати консоль логів",
+        systemLabel: "Система",
+        joinedChat: "приєднується до чату."
     },
     ru: {
         title: "Глобальный аудиочат",
@@ -58,11 +76,11 @@ const translations = {
         statusWait: "Нажмите кнопку для подключения...",
         statusMicRequest: "Запрос разрешения на микрофон...",
         statusNetConnect: "Подключение к международной сети...",
-        statusHostWait: "Вы Хост. Описание друзей...",
+        statusHostWait: "Вы Хост. Ожидание друзей...",
         statusGuestConnect: "Соединение с хостом...",
         statusConnected: "Связь установлена!",
         statusReconnecting: "Связь разорвана. Переподключение...",
-        modalText: "Браузер заблокировал звук в фоне. Нажмите для активации голосового потоку.",
+        modalText: "Браузер заблокировал звук в фоне. Нажмите для активации голосового потока.",
         modalBtn: "Включить звук",
         micNeeded: "Нужен доступ к микрофону!",
         errPermission: "Ошибка: Доступ к микрофону отклонен пользователем.",
@@ -70,12 +88,21 @@ const translations = {
         btnCopy: "Скопировать логи",
         btnCopied: "Скопировано!",
         btnMute: "Выключить мик.",
-        btnUnmute: "Включить мик."
+        btnUnmute: "Включить мик.",
+        namePrompt: "Введите ваше имя для старта:",
+        namePlaceholder: "Ваше имя...",
+        chatPlaceholder: "Напишите сообщение...",
+        chatSend: "Отпр.",
+        btnShowLog: "Показать консоль логов",
+        btnHideLog: "Скрыть консоль логов",
+        systemLabel: "Система",
+        joinedChat: "присоединяется к чату."
     }
 };
 
 let currentLang = 'en';
 
+// Нахождение DOM элементов
 const joinBtn = document.getElementById('joinBtn');
 const muteBtn = document.getElementById('muteBtn');
 const statusText = document.getElementById('statusText');
@@ -85,6 +112,22 @@ const audioContainer = document.getElementById('remoteAudioContainer');
 const overlay = document.getElementById('audioActivationOverlay');
 const modalBtn = document.getElementById('audioActivateBtn');
 const modalTxt = document.getElementById('txt-modal-alert');
+
+// Элементы нового функционала (Имя, Чат, Логи)
+const nameSetupOverlay = document.getElementById('nameSetupOverlay');
+const usernameInput = document.getElementById('usernameInput');
+const saveNameBtn = document.getElementById('saveNameBtn');
+const txtNamePrompt = document.getElementById('txt-name-prompt');
+
+const chatContainer = document.getElementById('chatContainer');
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendMsgBtn = document.getElementById('sendMsgBtn');
+
+const toggleLogBtn = document.getElementById('toggleLogBtn');
+const logSection = document.getElementById('logSection');
+
+let logsVisible = false;
 
 function log(msg, type = 'info') {
     let timestamp = new Date().toLocaleTimeString();
@@ -97,6 +140,7 @@ function log(msg, type = 'info') {
     logDiv.scrollTop = logDiv.scrollHeight;
 }
 
+// Переключение языков
 function changeLanguage(lang) {
     if (!translations[lang]) return;
     currentLang = lang;
@@ -109,7 +153,17 @@ function changeLanguage(lang) {
     document.getElementById('txt-badge').innerText = translations[lang].badge;
     modalBtn.innerText = translations[lang].modalBtn;
     modalTxt.innerText = translations[lang].modalText;
+    txtNamePrompt.innerText = translations[lang].namePrompt;
+    usernameInput.placeholder = translations[lang].namePlaceholder;
+    chatInput.placeholder = translations[lang].chatPlaceholder;
+    sendMsgBtn.innerText = translations[lang].chatSend;
     
+    if (logsVisible) {
+        toggleLogBtn.innerText = translations[lang].btnHideLog;
+    } else {
+        toggleLogBtn.innerText = translations[lang].btnShowLog;
+    }
+
     if (copyLogBtn.innerText !== translations.en.btnCopied && copyLogBtn.innerText !== translations.uk.btnCopied && copyLogBtn.innerText !== translations.ru.btnCopied) {
         copyLogBtn.innerText = translations[lang].btnCopy;
     }
@@ -140,6 +194,33 @@ function detectDeviceLanguage() {
 }
 
 detectDeviceLanguage();
+
+// Сохранение имени при входе
+saveNameBtn.addEventListener('click', () => {
+    const value = usernameInput.value.trim();
+    if (value.length > 0) {
+        myNickname = value;
+    }
+    nameSetupOverlay.style.display = 'none';
+    log(`User registered profile identity token: ${myNickname}`, "success");
+});
+
+usernameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveNameBtn.click();
+});
+
+// Переключатель скрытия консоли логов
+toggleLogBtn.addEventListener('click', () => {
+    logsVisible = !logsVisible;
+    if (logsVisible) {
+        logSection.style.display = 'block';
+        toggleLogBtn.innerText = translations[currentLang].btnHideLog;
+        logSection.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        logSection.style.display = 'none';
+        toggleLogBtn.innerText = translations[currentLang].btnShowLog;
+    }
+});
 
 const peerConfig = {
     config: {
@@ -196,7 +277,6 @@ joinBtn.addEventListener('click', async () => {
 
 muteBtn.addEventListener('click', () => {
     if (!localStream) return;
-    
     isMuted = !isMuted;
     
     localStream.getAudioTracks().forEach(track => {
@@ -222,6 +302,7 @@ function tryToConnectAsHost() {
         log(`Room session allocation success. Server ID registered: ${id}`, "success");
         statusText.innerText = translations[currentLang].statusHostWait;
         listenForCalls();
+        listenForDataConnections();
     });
 
     peer.on('error', (err) => {
@@ -245,12 +326,11 @@ function connectAsGuest() {
         
         makeGuestCall();
         listenForCalls();
+        listenForDataConnections();
     });
 
-    // ПЕРЕХВАТ ОШИБОК КЛИЕНТА (Срабатывает, когда хост выключен)
     peer.on('error', (err) => {
         log(`Guest node fatal runtime failure instance: ${err.type} | ${err.message}`, "error");
-        
         if (err.type === 'peer-unavailable') {
             log("Target Master Host is currently offline. Retrying handshake shortly...", "error");
             startReconnectionLoop(null);
@@ -259,7 +339,6 @@ function connectAsGuest() {
 }
 
 function makeGuestCall() {
-    // Безопасный сброс флага интервала перед совершением нового вызова
     if (reconnectInterval) {
         clearInterval(reconnectInterval);
         reconnectInterval = null;
@@ -271,6 +350,12 @@ function makeGuestCall() {
         const call = peer.call(ROOM_ID, localStream);
         if (call) {
             bindCallEvents(call);
+        }
+        // Инициализация дата-канала для Текстового чата
+        log(`Opening discrete data pipeline thread to Master Host...`);
+        const dataConn = peer.connect(ROOM_ID);
+        if (dataConn) {
+            bindDataConnectionEvents(dataConn);
         }
     } else {
         log("Peer instance is dead or destroyed. Initiating full guest node reset...");
@@ -285,10 +370,16 @@ function listenForCalls() {
             return;
         }
         log(`Inbound P2P signaling session call packet received from remote node: ${call.peer}`, "success");
-        log(`Answering WebRTC handshake. Mounting local audio data stream pipe context.`);
-        
         call.answer(localStream);
         bindCallEvents(call);
+    });
+}
+
+// Прослушивание входящих текстовых каналов (для Хоста)
+function listenForDataConnections() {
+    peer.on('connection', (dataConn) => {
+        log(`Inbound P2P layout data channel synchronized from node: ${dataConn.peer}`, "success");
+        bindDataConnectionEvents(dataConn);
     });
 }
 
@@ -305,6 +396,7 @@ function bindCallEvents(call) {
                     log("Active reconnection timers cleared. Channel stable.", "success");
                 }
                 log(`Direct P2P socket pipeline verified between routers. Waiting for stream data packets...`, "success");
+                chatContainer.style.display = 'block'; // Показываем чат при успешном коннекте
             }
             
             if (state === 'disconnected' || state === 'failed') {
@@ -330,12 +422,86 @@ function bindCallEvents(call) {
     });
 }
 
+// Логика работы P2P дата-канала чата
+function bindDataConnectionEvents(dataConn) {
+    dataConn.on('open', () => {
+        activeDataConnections.add(dataConn);
+        // Отправляем пакет системного интро, чтобы передать наше имя собеседнику
+        dataConn.send({
+            type: 'system-intro',
+            name: myNickname
+        });
+    });
+
+    dataConn.on('data', (data) => {
+        if (!data || typeof data !== 'object') return;
+
+        if (data.type === 'system-intro') {
+            appendChatMessage(translations[currentLang].systemLabel, `${data.name} ${translations[currentLang].joinedChat}`, '#f5c2e7', true);
+        } else if (data.type === 'text-message') {
+            appendChatMessage(data.sender, data.text, '#b4befe', false);
+        }
+    });
+
+    dataConn.on('close', () => {
+        activeDataConnections.delete(dataConn);
+        log(`Data pipeline socket closed down from node context: ${dataConn.peer}`, "error");
+    });
+
+    dataConn.on('error', (err) => {
+        log(`Data channel operation process error: ${err.message}`, "error");
+    });
+}
+
+// Функция отправки текстового сообщения
+function sendTextMessage() {
+    const text = chatInput.value.trim();
+    if (text.length === 0) return;
+
+    // Вывод своего сообщения на свой экран
+    appendChatMessage(myNickname, text, '#a6e3a1', false);
+    chatInput.value = '';
+
+    // Передача пакета во все активные соединения WebRTC
+    activeDataConnections.forEach(conn => {
+        if (conn.open) {
+            conn.send({
+                type: 'text-message',
+                sender: myNickname,
+                text: text
+            });
+        }
+    });
+}
+
+sendMsgBtn.addEventListener('click', sendTextMessage);
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendTextMessage();
+});
+
+// Рендеринг строк внутри чата
+function appendChatMessage(sender, text, nameColor = '#a6e3a1', isSystem = false) {
+    const msgElement = document.createElement('div');
+    if (isSystem) {
+        msgElement.innerHTML = `<i style="color: #9399b2;">[${translations[currentLang].systemLabel}] ${text}</i>`;
+    } else {
+        msgElement.innerHTML = `<strong style="color: ${nameColor}">${sender}:</strong> <span style="color: #cdd6f4;">${escapeHTML(text)}</span>`;
+    }
+    chatMessages.appendChild(msgElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function escapeHTML(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
 function startReconnectionLoop(currentCall) {
     if (currentCall) {
         currentCall.close();
     }
     
     connectedPeers.delete(ROOM_ID);
+    chatContainer.style.display = 'none'; // Скрываем чат при потере связи
     
     const oldAudio = document.getElementById(`audio-${ROOM_ID}`);
     if (oldAudio) oldAudio.remove();
