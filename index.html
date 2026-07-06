@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Audio, Video & Paint Group Room</title>
+    <title>Global Audio, Video & Paint Room</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -16,19 +16,17 @@
             min-height: 100vh;
             margin: 0;
             padding: 20px;
-            box-sizing: border-box;
         }
         .card {
             background: #1e1e2e;
             padding: 30px;
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            max-width: 950px;
+            max-width: 500px;
             width: 100%;
             text-align: center;
             border: 1px solid #313244;
             position: relative;
-            box-sizing: border-box;
         }
         .lang-switcher {
             position: absolute;
@@ -43,324 +41,285 @@
             cursor: pointer;
             border-radius: 4px;
             font-size: 12px;
-            transition: background 0.2s;
+            margin-left: 2px;
+            font-weight: bold;
         }
-        .lang-btn:hover { background: #45475a; }
-        
-        h1 { margin-top: 0; color: #cba6f7; font-size: 24px; }
+        .lang-btn.active {
+            background: #f5c2e7;
+            color: #11111b;
+            border-color: #f5c2e7;
+        }
+        h1 { margin-top: 15px; color: #a6e3a1; font-size: 24px; }
         .room-badge {
             background: #313244;
-            padding: 6px 12px;
+            color: #f5c2e7;
+            padding: 5px 12px;
             border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
             display: inline-block;
-            font-size: 13px;
-            color: #a6e3a1;
             margin-bottom: 20px;
         }
-        
-        /* Кнопки управления главным экраном */
-        .main-btn, .mute-btn, .cam-btn, .toggle-log-btn {
-            background: #cba6f7;
+        button.main-btn {
+            background: #a6e3a1;
             color: #11111b;
             border: none;
-            padding: 12px 24px;
+            padding: 14px 24px;
             font-size: 16px;
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
-            margin: 10px;
-            display: inline-block;
-            width: auto;
-        }
-        .main-btn:hover { background: #f5c2e7; }
-        .main-btn:disabled { background: #585b70; cursor: not-allowed; color: #a6adc8; }
-        
-        .mute-btn { background: #a6e3a1; }
-        .mute-btn:hover { background: #89b4fa; }
-        .mute-btn.muted { background: #f38ba8; }
-
-        .cam-btn { background: #89b4fa; }
-        .cam-btn:hover { background: #b4befe; }
-        .cam-btn.off { background: #f38ba8; }
-        
-        .status { margin: 15px 0; font-style: italic; color: #bac2de; font-size: 14px; }
-        
-        /* Сетка видеопотоков WebRTC */
-        .video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
             width: 100%;
+            transition: transform 0.1s, background 0.2s;
         }
-        .video-wrapper {
-            position: relative;
-            background: #11111b;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 2px solid #313244;
-            aspect-ratio: 4/3;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-        .video-wrapper.my-video { border-color: #cba6f7; }
+        button.main-btn:hover { background: #94e2d5; }
+        button.main-btn:active { transform: scale(0.98); }
+        button.main-btn:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; }
         
-        /* Эффект фиолетового свечения вокруг камеры говорящего */
-        .video-wrapper.speaking {
-            border-color: #cba6f7 !important;
-            box-shadow: 0 0 18px rgba(203, 166, 247, 0.85);
+        .media-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .media-btn {
+            display: none;
+            flex: 1;
+            background: #f9e2af;
+            color: #11111b;
+            border: none;
+            padding: 12px 10px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+        .media-btn:active { transform: scale(0.98); }
+        .media-btn.muted { background: #f38ba8; }
+        #flipCamBtn { background: #89b4fa; color: #11111b; }
+
+        .status {
+            font-size: 15px;
+            color: #bac2de;
+            margin: 20px 0;
+            min-height: 22px;
         }
 
-        .video-wrapper video {
+        /* Видео контейнеры */
+        .video-grid {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .video-box {
+            background: #11111b;
+            border: 1px solid #313244;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+            position: relative;
+        }
+        .video-box video {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        
-        /* Компактная плашка имени пользователя поверх видео */
+        .video-box.local video {
+            transform: scaleX(-1); /* Зеркалим локальную вебку */
+        }
         .video-label {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(17, 17, 27, 0.85);
+            bottom: 5px;
+            left: 5px;
+            background: rgba(17, 17, 27, 0.7);
             color: #cdd6f4;
-            padding: 5px 10px;
-            font-size: 12px;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            font-weight: 600;
-            border-radius: 6px;
-            border: 1px solid rgba(108, 112, 134, 0.4);
-            pointer-events: none;
-            max-width: 60%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            z-index: 10;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            font-size: 11px;
+            border-radius: 4px;
         }
 
-        /* Индикатор перечеркнутого микрофона */
-        .mic-status-icon {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(243, 139, 168, 0.9);
-            color: #11111b;
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            display: none; /* по умолчанию скрыт */
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: bold;
-            z-index: 10;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            pointer-events: none;
-        }
-        
-        /* Интерфейс Текстового Чата */
+        /* Стили текстового чата */
         .chat-container {
             display: none;
-            flex-direction: column;
-            background: #11111b;
-            border-radius: 12px;
+            margin-top: 15px;
             border: 1px solid #313244;
-            padding: 15px;
-            margin: 20px 0;
+            border-radius: 8px;
+            background: #11111b;
+            padding: 12px;
             text-align: left;
-            box-sizing: border-box;
         }
         .chat-messages {
-            height: 160px;
+            height: 120px;
             overflow-y: auto;
-            margin-bottom: 12px;
-            border-bottom: 1px solid #313244;
-            padding-bottom: 10px;
-            font-size: 14px;
-        }
-        .chat-messages .msg { margin-bottom: 6px; line-height: 1.4; }
-        .chat-messages .sender { font-weight: bold; margin-right: 5px; }
-        
-        .chat-input-row {
-            display: flex;
-            gap: 10px;
-            width: 100%;
-            align-items: center;
-        }
-        .chat-input-row input[type="text"] {
-            flex: 1;
-            background: #313244;
-            border: 1px solid #45475a;
+            font-size: 13px;
             color: #cdd6f4;
-            padding: 10px 14px;
-            border-radius: 6px;
-            font-size: 14px;
-            outline: none;
-            box-sizing: border-box;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
-        
-        .chat-input-row .chat-send-btn {
-            background: #89b4fa !important;
-            color: #11111b !important;
-            border: none !important;
-            padding: 0 20px !important;
-            font-size: 14px !important;
-            font-weight: bold !important;
-            border-radius: 6px !important;
-            cursor: pointer !important;
-            transition: background 0.2s !important;
-            width: auto !important;
-            min-width: 80px !important;
-            max-width: 120px !important;
-            height: 38px !important;
-            margin: 0 !important;
-            display: inline-block !important;
+        .chat-input-row { display: flex; gap: 8px; }
+        .chat-input-row input {
+            flex: 1; padding: 8px 12px; border-radius: 6px;
+            border: 1px solid #45475a; background: #1e1e2e;
+            color: #cdd6f4; font-size: 13px;
         }
-        .chat-input-row .chat-send-btn:hover { background: #b4befe !important; }
-        
-        /* Секция холста рисования */
+        .chat-input-row input:focus { outline: none; border-color: #f5c2e7; }
+        .chat-send-btn {
+            background: #f5c2e7; color: #11111b; border: none;
+            padding: 0 16px; border-radius: 6px; font-weight: bold;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .chat-send-btn:hover { background: #eba0b8; }
+
+        /* Секция совместного рисования */
         .paint-container {
             display: none;
-            background: #11111b;
-            border-radius: 12px;
+            margin-top: 15px;
             border: 1px solid #313244;
-            padding: 15px;
-            margin: 20px 0;
-            box-sizing: border-box;
+            border-radius: 8px;
+            background: #11111b;
+            padding: 12px;
         }
         .paint-toolbar {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            gap: 15px;
             flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            background: #1e1e2e;
+            padding: 8px;
+            border-radius: 6px;
         }
         .tool-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            font-size: 12px;
+            color: #bac2de;
         }
         .tool-group input[type="color"] {
             border: none;
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
             cursor: pointer;
-            background: none;
-            padding: 0;
+            background: transparent;
         }
         .tool-group input[type="range"] {
-            width: 90px;
-            accent-color: #cba6f7;
+            width: 60px;
             cursor: pointer;
         }
-        
         .history-btn {
-            background: #313244 !important;
-            color: #cdd6f4 !important;
-            border: 1px solid #45475a !important;
-            padding: 6px 14px !important;
-            font-size: 13px !important;
-            border-radius: 6px !important;
-            cursor: pointer !important;
-            transition: all 0.2s !important;
-            margin: 0 2px !important;
-            width: auto !important;
-            display: inline-block !important;
-            font-weight: normal !important;
-        }
-        .history-btn:hover { background: #45475a !important; color: #f5e0dc !important; }
-        .history-btn.clear-btn { background: rgba(243, 139, 168, 0.15) !important; border-color: #f38ba8 !important; color: #f38ba8 !important; }
-        .history-btn.clear-btn:hover { background: #f38ba8 !important; color: #11111b !important; }
-        
-        canvas {
-            background: #ffffff;
-            border-radius: 8px;
-            border: 2px solid #313244;
-            cursor: crosshair;
-            max-width: 100%;
-            height: auto;
-            touch-action: none;
-        }
-        
-        /* Окно логов консоли */
-        .toggle-log-btn { background: #6c7086; color: #cdd6f4; font-size: 13px; padding: 8px 16px; }
-        .toggle-log-btn:hover { background: #a6adc8; color: #11111b; }
-        .log-section { display: none; width: 100%; text-align: left; margin-top: 15px; box-sizing: border-box; }
-        .log-window {
-            background: #11111b;
-            border: 1px solid #313244;
-            border-radius: 8px;
-            padding: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-            max-height: 150px;
-            overflow-y: auto;
-            white-space: nowrap;
-            color: #a6e3a1;
-            box-sizing: border-box;
-        }
-        .log-actions { margin-top: 8px; text-align: right; }
-        .copy-btn {
             background: #313244;
             color: #cdd6f4;
             border: 1px solid #45475a;
-            padding: 6px 12px;
-            cursor: pointer;
-            border-radius: 4px;
+            padding: 4px 6px;
             font-size: 12px;
-            display: inline-block;
-            width: auto;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
         }
-        .copy-btn:hover { background: #45475a; }
+        .history-btn:hover { background: #45475a; }
+        .history-btn.clear-btn { background: #f38ba8; color: #11111b; border-color: #f38ba8; }
+        .history-btn.clear-btn:hover { background: #eba0b8; }
         
-        /* Системный оверлей активации аудио */
+        #paintCanvas {
+            background: #ffffff;
+            border-radius: 6px;
+            cursor: crosshair;
+            display: block;
+            touch-action: none;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Консоль логов */
+        .log-container { display: none; margin-top: 15px; text-align: right; }
+        .copy-btn, .toggle-log-btn {
+            background: #313244; color: #f5e0dc; border: 1px solid #45475a;
+            padding: 6px 12px; font-size: 12px; border-radius: 6px;
+            cursor: pointer; margin-bottom: 6px; font-weight: 500;
+        }
+        .toggle-log-btn { width: 100%; margin-top: 12px; padding: 10px; font-size: 13px; }
+        #log {
+            background: #11111b; padding: 12px; border-radius: 8px;
+            height: 150px; overflow-y: auto; font-size: 11px;
+            text-align: left; color: #f5e0dc; font-family: monospace;
+            border: 1px solid #313244; white-space: pre-wrap; word-break: break-all;
+        }
+        
         .audio-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(17,17,27,0.85); display: none; align-items: center; justify-content: center; z-index: 9999;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(17, 17, 27, 0.9); backdrop-filter: blur(6px);
+            z-index: 9999; justify-content: center; align-items: center;
         }
         .audio-modal {
-            background: #1e1e2e; padding: 25px; border-radius: 12px; border: 1px solid #313244; max-width: 340px; text-align: center;
+            background: #313244; padding: 25px 35px; border-radius: 12px;
+            border: 2px solid #f5c2e7; text-align: center; max-width: 320px; width: 100%;
         }
-        .audio-modal p { margin: 0 0 15px 0; font-size: 14px; line-height: 1.5; }
+        .audio-modal p { margin: 0 0 15px 0; font-size: 16px; color: #cdd6f4; }
+        .audio-modal input.name-input {
+            width: 90%; padding: 10px; border-radius: 6px; border: 1px solid #45475a;
+            background: #1e1e2e; color: #cdd6f4; margin-bottom: 15px; text-align: center; font-size: 16px;
+        }
         .audio-modal button {
-            background: #f5c2e7; color: #11111b; border: none; padding: 10px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%;
+            background: #f5c2e7; color: #11111b; border: none;
+            padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%;
         }
+        #remoteMediaContainer { display: none; }
     </style>
 </head>
 <body>
 
+<div id="nameSetupOverlay" class="audio-overlay" style="display: flex;">
+    <div class="audio-modal">
+        <p id="txt-name-prompt">Enter your nickname to start:</p>
+        <input type="text" id="usernameInput" class="name-input" maxlength="20" placeholder="Your name...">
+        <button id="saveNameBtn">Confirm</button>
+    </div>
+</div>
+
 <div id="audioActivationOverlay" class="audio-overlay">
     <div class="audio-modal">
-        <p id="txt-modal-alert">Your browser blocked background audio. Click to activate voice stream.</p>
+        <p id="txt-modal-alert">Your browser blocked background audio. Click to activate stream.</p>
         <button id="audioActivateBtn">Unmute Audio</button>
     </div>
 </div>
 
 <div class="card">
     <div class="lang-switcher">
-        <button class="lang-btn" id="btn-en">EN</button>
-        <button class="lang-btn" id="btn-uk">UK</button>
-        <button class="lang-btn" id="btn-ru">RU</button>
+        <button class="lang-btn" id="btn-en" onclick="changeLanguage('en')">EN</button>
+        <button class="lang-btn" id="btn-uk" onclick="changeLanguage('uk')">UK</button>
+        <button class="lang-btn" id="btn-ru" onclick="changeLanguage('ru')">RU</button>
     </div>
 
-    <h1 id="txt-title">Global Video & Paint Chat</h1>
-    <div class="room-badge" id="txt-badge">Room: World Wide Grid</div>
+    <h1 id="txt-title">Global HD Video Chat</h1>
+    <div class="room-badge" id="txt-badge">Room: World Wide</div>
     
-    <div>
-        <button id="joinBtn" class="main-btn" disabled>Join Room</button>
-        <button id="muteBtn" class="mute-btn" style="display:none;">Mute Mic</button>
-        <button id="camBtn" class="cam-btn" style="display:none;">Stop Cam</button>
+    <button id="joinBtn" class="main-btn">Join Room</button>
+    
+    <div class="media-controls">
+        <button id="muteBtn" class="media-btn">Mute Mic</button>
+        <button id="flipCamBtn" class="media-btn">Flip Cam</button>
     </div>
     
-    <div class="status" id="statusText">Requesting 720p HD stream...</div>
-    
-    <div id="videoGrid" class="video-grid"></div>
+    <div class="status" id="statusText">Click button to connect...</div>
+
+    <div id="videoGrid" class="video-grid">
+        <div class="video-box local">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <div class="video-label" id="lbl-me">You</div>
+        </div>
+        <div class="video-box" id="remoteVideoBox">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div class="video-label" id="lbl-peer">Friend</div>
+        </div>
+    </div>
     
     <div id="chatContainer" class="chat-container">
         <div id="chatMessages" class="chat-messages"></div>
@@ -373,7 +332,7 @@
     <div id="paintContainer" class="paint-container">
         <div class="paint-toolbar">
             <div class="tool-group">
-                <input type="color" id="brushColor" value="#cba6f7">
+                <input type="color" id="brushColor" value="#1e1e2e">
                 <input type="range" id="brushSize" min="1" max="40" value="5">
                 <input type="range" id="brushOpacity" min="0.1" max="1.0" step="0.1" value="1.0">
             </div>
@@ -383,20 +342,21 @@
                 <button id="clearBtn" class="history-btn clear-btn">🗑️ Clear</button>
             </div>
         </div>
-        <canvas id="paintCanvas" width="500" height="320"></canvas>
+        <canvas id="paintCanvas" width="440" height="300"></canvas>
     </div>
 
     <button id="toggleLogBtn" class="toggle-log-btn">Show Console Logs</button>
     
-    <div id="logSection" class="log-section">
-        <div id="logDiv" class="log-window"></div>
-        <div class="log-actions">
-            <button id="copyLogBtn" class="copy-btn">Copy Logs</button>
-        </div>
+    <div id="remoteMediaContainer"></div>
+    
+    <div id="logSection" class="log-container">
+        <button id="copyLogBtn" class="copy-btn">Copy Logs</button>
+        <div id="log">System ready.</div>
     </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="app.js"></script>
+
 </body>
 </html>
