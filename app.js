@@ -4,7 +4,6 @@ const MY_GUEST_ID = "guest-" + Math.random().toString(36).substring(2, 9);
 let peer = null;
 let localStream = null;
 let isMuted = false;
-let isCamFullyOff = false; // Отслеживание полного отключения камеры
 let currentFacingMode = "user"; 
 let reconnectInterval = null; 
 let myNickname = "User";
@@ -45,8 +44,6 @@ const translations = {
         btnCopied: "Copied!",
         btnMute: "Mute Mic",
         btnUnmute: "Unmute Mic",
-        btnCamOff: "Turn Cam Off", 
-        btnCamOn: "Turn Cam On",  
         namePrompt: "Enter your nickname to start:",
         namePlaceholder: "Your name...",
         chatPlaceholder: "Type a message...",
@@ -79,9 +76,7 @@ const translations = {
         btnCopy: "Скопіювати логи",
         btnCopied: "Скопійовано!",
         btnMute: "Вимкнути мік.",
-        btnUnmute: "Увімкнути мік.",
-        btnCamOff: "Вимкнути кам.",
-        btnCamOn: "Увімкнути кам.",
+        btnUnmute: "Увімкнути мік." ,
         namePrompt: "Введіть ваше ім'я для старту:",
         namePlaceholder: "Ваше ім'я...",
         chatPlaceholder: "Напишіть повідомлення...",
@@ -115,8 +110,6 @@ const translations = {
         btnCopied: "Скопировано!",
         btnMute: "Выключить мик.",
         btnUnmute: "Включить мик.",
-        btnCamOff: "Выключить кам.",
-        btnCamOn: "Включить кам.",
         namePrompt: "Введите ваше имя для старта:",
         namePlaceholder: "Ваше имя...",
         chatPlaceholder: "Напишите сообщение...",
@@ -137,7 +130,6 @@ let currentLang = 'en';
 // Поиск DOM элементов
 const joinBtn = document.getElementById('joinBtn');
 const muteBtn = document.getElementById('muteBtn');
-const camOffBtn = document.getElementById('camOffBtn');
 const flipCamBtn = document.getElementById('flipCamBtn');
 const statusText = document.getElementById('statusText');
 const logDiv = document.getElementById('log');
@@ -194,43 +186,33 @@ function changeLanguage(lang) {
     const targetBtn = document.getElementById(`btn-${lang}`);
     if (targetBtn) targetBtn.classList.add('active');
 
-    if (document.getElementById('txt-title')) document.getElementById('txt-title').innerText = translations[lang].title;
-    if (document.getElementById('txt-badge')) document.getElementById('txt-badge').innerText = translations[lang].badge;
-    if (modalBtn) modalBtn.innerText = translations[lang].modalBtn;
-    if (modalTxt) modalTxt.innerText = translations[lang].modalText;
-    if (txtNamePrompt) txtNamePrompt.innerText = translations[lang].namePrompt;
-    if (usernameInput) usernameInput.placeholder = translations[lang].namePlaceholder;
-    if (chatInput) chatInput.placeholder = translations[lang].chatPlaceholder;
-    if (sendMsgBtn) sendMsgBtn.innerText = translations[lang].chatSend;
-    if (document.getElementById('lbl-me')) document.getElementById('lbl-me').innerText = translations[lang].lblMe;
-    if (document.getElementById('lbl-peer')) document.getElementById('lbl-peer').innerText = translations[lang].lblPeer;
-    if (clearBtn) clearBtn.innerText = translations[lang].btnClear;
+    document.getElementById('txt-title').innerText = translations[lang].title;
+    document.getElementById('txt-badge').innerText = translations[lang].badge;
+    modalBtn.innerText = translations[lang].modalBtn;
+    modalTxt.innerText = translations[lang].modalText;
+    txtNamePrompt.innerText = translations[lang].namePrompt;
+    usernameInput.placeholder = translations[lang].namePlaceholder;
+    chatInput.placeholder = translations[lang].chatPlaceholder;
+    sendMsgBtn.innerText = translations[lang].chatSend;
+    document.getElementById('lbl-me').innerText = translations[lang].lblMe;
+    document.getElementById('lbl-peer').innerText = translations[lang].lblPeer;
+    clearBtn.innerText = translations[lang].btnClear;
     
-    // --- ИСПРАВЛЕННАЯ ЛОГИКА: Локализация и удержание видимости кнопки ---
-    const camOffBtnElement = document.getElementById('camOffBtn');
-    if (camOffBtnElement) {
-        camOffBtnElement.innerText = isCamFullyOff ? translations[lang].btnCamOn : translations[lang].btnCamOff;
-        
-        // Если стрим уже успешно захвачен, принудительно держим кнопку видимой при смене языка
-        if (localStream) {
-            camOffBtnElement.style.display = 'block';
-        }
-    }
-    // ---------------------------------------------------------------------
-    
-    if (toggleLogBtn) {
-        toggleLogBtn.innerText = logsVisible ? translations[lang].btnHideLog : translations[lang].btnShowLog;
+    if (logsVisible) {
+        toggleLogBtn.innerText = translations[lang].btnHideLog;
+    } else {
+        toggleLogBtn.innerText = translations[lang].btnShowLog;
     }
 
-    if (copyLogBtn && copyLogBtn.innerText !== translations.en.btnCopied && copyLogBtn.innerText !== translations.uk.btnCopied && copyLogBtn.innerText !== translations.ru.btnCopied) {
+    if (copyLogBtn.innerText !== translations.en.btnCopied && copyLogBtn.innerText !== translations.uk.btnCopied && copyLogBtn.innerText !== translations.ru.btnCopied) {
         copyLogBtn.innerText = translations[lang].btnCopy;
     }
     
-    if (joinBtn && !joinBtn.disabled) joinBtn.innerText = translations[lang].btnJoin;
-    if (muteBtn) {
-        muteBtn.innerText = isMuted ? translations[lang].btnUnmute : translations[lang].btnMute;
-    }
+    if (!joinBtn.disabled) joinBtn.innerText = translations[lang].btnJoin;
+    if (isMuted) muteBtn.innerText = translations[lang].btnUnmute;
+    else muteBtn.innerText = translations[lang].btnMute;
 }
+
 function detectDeviceLanguage() {
     const browserLang = navigator.language || navigator.userLanguage;
     const shortLang = browserLang.substring(0, 2).toLowerCase();
@@ -245,7 +227,6 @@ detectDeviceLanguage();
 function initCanvas() {
     log("Initializing Canvas element...", "info");
     canvas = document.getElementById('paintCanvas');
-    if (!canvas) return;
     ctx = canvas.getContext('2d');
     
     ctx.lineCap = 'round';
@@ -348,7 +329,6 @@ function convertHexToRGBA(hex, opacity) {
 }
 
 function redrawCanvas() {
-    if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     drawingHistory.forEach(stroke => {
@@ -365,37 +345,31 @@ function redrawCanvas() {
     });
 }
 
-if (undoBtn) {
-    undoBtn.addEventListener('click', () => {
-        if (drawingHistory.length === 0) return;
-        const popped = drawingHistory.pop();
-        redoStack.push(popped);
-        redrawCanvas();
-        log("Undo action executed", "info");
-        broadcastPaintData({ type: 'paint-undo' });
-    });
-}
+undoBtn.addEventListener('click', () => {
+    if (drawingHistory.length === 0) return;
+    const popped = drawingHistory.pop();
+    redoStack.push(popped);
+    redrawCanvas();
+    log("Undo action executed", "info");
+    broadcastPaintData({ type: 'paint-undo' });
+});
 
-if (redoBtn) {
-    redoBtn.addEventListener('click', () => {
-        if (redoStack.length === 0) return;
-        const popped = redoStack.pop();
-        drawingHistory.push(popped);
-        redrawCanvas();
-        log("Redo action executed", "info");
-        broadcastPaintData({ type: 'paint-redo', stroke: popped });
-    });
-}
+redoBtn.addEventListener('click', () => {
+    if (redoStack.length === 0) return;
+    const popped = redoStack.pop();
+    drawingHistory.push(popped);
+    redrawCanvas();
+    log("Redo action executed", "info");
+    broadcastPaintData({ type: 'paint-redo', stroke: popped });
+});
 
-if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-        drawingHistory = [];
-        redoStack = [];
-        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-        log("Canvas cleared locally by user", "success");
-        broadcastPaintData({ type: 'paint-clear' });
-    });
-}
+clearBtn.addEventListener('click', () => {
+    drawingHistory = [];
+    redoStack = [];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    log("Canvas cleared locally by user", "success");
+    broadcastPaintData({ type: 'paint-clear' });
+});
 
 function broadcastPaintData(data) {
     activeDataConnections.forEach(conn => {
@@ -405,35 +379,29 @@ function broadcastPaintData(data) {
     });
 }
 
-if (saveNameBtn) {
-    saveNameBtn.addEventListener('click', () => {
-        const value = usernameInput.value.trim();
-        if (value.length > 0) myNickname = value;
-        nameSetupOverlay.style.display = 'none';
-        log(`User identity locked: "${myNickname}"`, "success");
-        initCanvas();
-    });
-}
+saveNameBtn.addEventListener('click', () => {
+    const value = usernameInput.value.trim();
+    if (value.length > 0) myNickname = value;
+    nameSetupOverlay.style.display = 'none';
+    log(`User identity locked: "${myNickname}"`, "success");
+    initCanvas();
+});
 
-if (usernameInput) {
-    usernameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') saveNameBtn.click();
-    });
-}
+usernameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveNameBtn.click();
+});
 
-if (toggleLogBtn) {
-    toggleLogBtn.addEventListener('click', () => {
-        logsVisible = !logsVisible;
-        if (logsVisible) {
-            logSection.style.display = 'block';
-            toggleLogBtn.innerText = translations[currentLang].btnHideLog;
-            logSection.scrollIntoView({ behavior: 'smooth' });
-        } else {
-            logSection.style.display = 'none';
-            toggleLogBtn.innerText = translations[currentLang].btnShowLog;
-        }
-    });
-}
+toggleLogBtn.addEventListener('click', () => {
+    logsVisible = !logsVisible;
+    if (logsVisible) {
+        logSection.style.display = 'block';
+        toggleLogBtn.innerText = translations[currentLang].btnHideLog;
+        logSection.scrollIntoView({ behavior: 'smooth' });
+    } else {
+        logSection.style.display = 'none';
+        toggleLogBtn.innerText = translations[currentLang].btnShowLog;
+    }
+});
 
 const peerConfig = {
     config: {
@@ -453,79 +421,72 @@ const peerConfig = {
     }
 };
 
-if (joinBtn) {
-    joinBtn.addEventListener('click', async () => {
-        joinBtn.disabled = true;
-        statusText.innerText = translations[currentLang].statusMicRequest;
-        log(`Requesting localized WebRTC hardware interface (Camera facingMode: ${currentFacingMode}, Resolution: 720p)...`, "info");
-        
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({ 
-                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, 
-                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode } 
-            });
-            
-  log("Camera and Mic hardware streams grabbed successfully", "success");
-            localVideo.srcObject = localStream;
-            videoGrid.style.display = 'grid';
-            statusText.innerText = translations[currentLang].statusNetConnect;
-            
-            if (muteBtn) muteBtn.style.display = 'block';
-            if (camOffBtn) camOffBtn.style.display = 'block'; // --- ТОЧЕЧНОЕ ДОБАВЛЕНИЕ ---
-            if (flipCamBtn) flipCamBtn.style.display = 'block';
-            
-            tryToConnectAsHost();
-        } catch (err) {
-            log(`Media permissions crash: ${err.name} - ${err.message}`, "error");
-            statusText.innerText = translations[currentLang].micNeeded;
-            joinBtn.disabled = false;
-        }
-    });
-}
-
-if (muteBtn) {
-    muteBtn.addEventListener('click', () => {
-        if (!localStream) return;
-        isMuted = !isMuted;
-        localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
-        log(`Microphone track toggled. Muted state: ${isMuted}`, "info");
-        
-        if (isMuted) {
-            muteBtn.classList.add('muted');
-            muteBtn.innerText = translations[currentLang].btnUnmute;
-        } else {
-            muteBtn.classList.remove('muted');
-            muteBtn.innerText = translations[currentLang].btnMute;
-        }
-    });
-}
-
-if (flipCamBtn) {
-    flipCamBtn.addEventListener('click', async () => {
-        if (!localStream) return;
-        
-        currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-        log(`Executing camera switch -> facingMode: "${currentFacingMode}"`, "info");
+joinBtn.addEventListener('click', async () => {
+    joinBtn.disabled = true;
+    statusText.innerText = translations[currentLang].statusMicRequest;
+    log(`Requesting localized WebRTC hardware interface (Camera facingMode: ${currentFacingMode}, Resolution: 720p)...`, "info");
     
-        try {
-            const tempStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }
-            });
-            
-            const newVideoTrack = tempStream.getVideoTracks()[0];
-            const oldVideoTrack = localStream.getVideoTracks()[0];
-            
-            localStream.removeTrack(oldVideoTrack);
-            oldVideoTrack.stop();
-            localStream.addTrack(newVideoTrack);
-            
-/// Если камера фронтальная — зеркалим её, если задняя — показываем как есть
-        if (currentFacingMode === "user") {
-            localVideo.style.transform = 'scaleX(-1)';
-        } else {
-            localVideo.style.transform = 'none';
-        }
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, 
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode } 
+        });
         
+        log("Camera and Mic hardware streams grabbed successfully", "success");
+        localVideo.srcObject = localStream;
+        videoGrid.style.display = 'grid';
+        statusText.innerText = translations[currentLang].statusNetConnect;
+        
+        muteBtn.style.display = 'block';
+        flipCamBtn.style.display = 'block';
+        
+        tryToConnectAsHost();
+    } catch (err) {
+        log(`Media permissions crash: ${err.name} - ${err.message}`, "error");
+        statusText.innerText = translations[currentLang].micNeeded;
+        joinBtn.disabled = false;
+    }
+});
+
+muteBtn.addEventListener('click', () => {
+    if (!localStream) return;
+    isMuted = !isMuted;
+    localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+    log(`Microphone track toggled. Muted state: ${isMuted}`, "info");
+    
+    if (isMuted) {
+        muteBtn.classList.add('muted');
+        muteBtn.innerText = translations[currentLang].btnUnmute;
+    } else {
+        muteBtn.classList.remove('muted');
+        muteBtn.innerText = translations[currentLang].btnMute;
+    }
+});
+
+flipCamBtn.addEventListener('click', async () => {
+    if (!localStream) return;
+    
+    currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+    log(`Executing camera switch -> facingMode: "${currentFacingMode}"`, "info");
+
+    try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }
+        });
+        
+        const newVideoTrack = tempStream.getVideoTracks()[0];
+        const oldVideoTrack = localStream.getVideoTracks()[0];
+        
+        localStream.removeTrack(oldVideoTrack);
+        oldVideoTrack.stop();
+        localStream.addTrack(newVideoTrack);
+        
+        if (currentFacingMode === "environment") {
+            document.querySelector('.video-box.local').style.transform = 'none';
+            localVideo.style.transform = 'none';
+        } else {
+            localVideo.style.transform = 'scaleX(-1)';
+        }
         localVideo.srcObject = localStream;
 
         if (peer && peer.connections[ROOM_ID]) {
@@ -543,7 +504,6 @@ if (flipCamBtn) {
         log(`Failed to hot-swap camera tracks: ${err.message}`, "error");
     }
 });
-}
 
 function tryToConnectAsHost() {
     log(`Attempting to bind global target node: "${ROOM_ID}"`, "info");
@@ -558,11 +518,6 @@ function tryToConnectAsHost() {
         chatContainer.style.display = 'block';
         paintContainer.style.display = 'block';
         remoteVideoBox.style.opacity = '0.3'; // Затемняем окно гостя пока его нет
-        
-        // --- ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: Показываем кнопку рестарта только Хосту ---
-        const restartBtn = document.getElementById('globalRestartBtn');
-        if (restartBtn) restartBtn.style.display = 'inline-block';
-        // --------------------------------------------------------------------
         
         listenForCalls();
         listenForDataConnections();
@@ -717,7 +672,6 @@ function bindDataConnectionEvents(dataConn) {
         
         // Обработка синхронизации рисования холста
         else if (data.type === 'paint-live-draw') {
-            if (!ctx) return;
             ctx.beginPath();
             ctx.strokeStyle = convertHexToRGBA(data.color, data.opacity);
             ctx.lineWidth = data.size;
@@ -742,17 +696,14 @@ function bindDataConnectionEvents(dataConn) {
         } else if (data.type === 'paint-clear') {
             drawingHistory = [];
             redoStack = [];
-            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             log("Canvas fully flushed via synchronization signal from peer", "info");
-        } 
-        // --- ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: ПРИЕМ СИГНАЛА РЕСТАРТА ОТ ХОСТА ---
-        else if (data.type === 'remote-force-reload') {
-            log("Получена команда принудительного перезапуска от хоста. Перезагрузка...", "error");
-            setTimeout(() => {
-                if (peer) peer.destroy();
-                location.reload();
-            }, 500);
         }
+    });
+
+    dataConn.on('close', () => {
+        log(`Data sync channel closed for node: ${dataConn.peer}`, "info");
+        activeDataConnections.delete(dataConn);
     });
 }
 
@@ -770,12 +721,10 @@ function sendTextMessage() {
     });
 }
 
-if (sendMsgBtn) sendMsgBtn.addEventListener('click', sendTextMessage);
-if (chatInput) {
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendTextMessage();
-    });
-}
+sendMsgBtn.addEventListener('click', sendTextMessage);
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendTextMessage();
+});
 
 function appendChatMessage(sender, text, nameColor = '#a6e3a1', isSystem = false) {
     const msgElement = document.createElement('div');
@@ -784,10 +733,8 @@ function appendChatMessage(sender, text, nameColor = '#a6e3a1', isSystem = false
     } else {
         msgElement.innerHTML = `<strong style="color: ${nameColor}">${sender}:</strong> <span style="color: #cdd6f4;">${escapeHTML(text)}</span>`;
     }
-    if (chatMessages) {
-        chatMessages.appendChild(msgElement);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+    chatMessages.appendChild(msgElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function escapeHTML(str) {
@@ -827,88 +774,23 @@ function addMediaStream(peerId, stream) {
         });
 }
 
-if (modalBtn) {
-    modalBtn.addEventListener('click', () => {
-        overlay.style.display = 'none';
-        remoteVideo.play()
-            .then(() => statusText.innerText = translations[currentLang].statusConnected)
-            .catch(err => log(`Forced stream activation rejected: ${err.message}`, "error"));
-    });
-}
+modalBtn.addEventListener('click', () => {
+    overlay.style.display = 'none';
+    remoteVideo.play()
+        .then(() => statusText.innerText = translations[currentLang].statusConnected)
+        .catch(err => log(`Forced stream activation rejected: ${err.message}`, "error"));
+});
 
-if (copyLogBtn) {
-    copyLogBtn.addEventListener('click', () => {
-        const textToCopy = logDiv.innerText || logDiv.textContent;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => showCopiedFeedback())
-                .catch(err => fallbackCopyText(textToCopy));
-        } else {
-            fallbackCopyText(textToCopy);
-        }
-    });
-}
-
-// ========================================================
-// ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: УПРАВЛЕНИЕ КАМЕРОЙ И ГЛОБАЛЬНЫЙ РЕСТАРТ
-// ========================================================
-
-// 1. Обработчик полного отключения видеотрека камеры
-if (camOffBtn) {
-    camOffBtn.addEventListener('click', () => {
-        if (!localStream) return;
-        
-        isCamFullyOff = !isCamFullyOff;
-        
-        // Отключаем/включаем только видеотреки внутри нашего локального стрима
-        localStream.getVideoTracks().forEach(track => {
-            track.enabled = !isCamFullyOff;
-        });
-
-        // Меняем внешний вид кнопки и подтягиваем текст из словаря translations
-        if (isCamFullyOff) {
-            camOffBtn.style.background = '#f38ba8';
-            camOffBtn.style.color = '#11111b';
-            camOffBtn.innerText = translations[currentLang].btnCamOn; // Берет перевод "Включить кам." / "Turn Cam On"
-            log("Видеопоток вашей камеры остановлен.", "warn");
-        } else {
-            camOffBtn.style.background = '';
-            camOffBtn.style.color = '';
-            camOffBtn.innerText = translations[currentLang].btnCamOff; // Берет перевод "Выключить кам." / "Turn Cam Off"
-            log("Видеопоток вашей камеры восстановлен.", "success");
-        }
-    });
-}
-
-// 2. Обработчик отправки команды рестарта (доступен только для Хоста)
-const globalRestartBtn = document.getElementById('globalRestartBtn');
-if (globalRestartBtn) {
-    globalRestartBtn.addEventListener('click', () => {
-        const confirmRestart = confirm("Вы уверены, что хотите принудительно перезагрузить страницу у ВСЕХ участников?");
-        if (!confirmRestart) return;
-
-        log("Отправка сигнала глобального перезапуска всем участникам...", "warn");
-
-        // Перебираем твой Set активных подключений: activeDataConnections
-        activeDataConnections.forEach(conn => {
-            if (conn.open) {
-                try {
-                    conn.send({ type: "remote-force-reload" });
-                } catch(e) {
-                    console.error("Не удалось отправить сигнал рестарта пиру:", e);
-                }
-            }
-        });
-
-        // Перезагружаем самого хоста с небольшой задержкой, чтобы пакеты успели уйти в сеть
-        setTimeout(() => {
-            if (peer) peer.destroy();
-            location.reload();
-        }, 800);
-    });
-}
-
-// ========================================================
+copyLogBtn.addEventListener('click', () => {
+    const textToCopy = logDiv.innerText || logDiv.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => showCopiedFeedback())
+            .catch(err => fallbackCopyText(textToCopy));
+    } else {
+        fallbackCopyText(textToCopy);
+    }
+});
 
 function fallbackCopyText(text) {
     const textArea = document.createElement("textarea");
@@ -927,7 +809,6 @@ function fallbackCopyText(text) {
 }
 
 function showCopiedFeedback() {
-    if (!copyLogBtn) return;
     copyLogBtn.innerText = translations[currentLang].btnCopied;
     copyLogBtn.style.borderColor = '#a6e3a1';
     copyLogBtn.style.color = '#a6e3a1';
