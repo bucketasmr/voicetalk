@@ -161,7 +161,8 @@ const logSection = document.getElementById('logSection');
 
 const videoGrid = document.getElementById('videoGrid');
 const localVideo = document.getElementById('localVideo');
-const remoteVideosContainer = document.getElementById('remoteVideosContainer');
+const remoteVideo = document.getElementById('remoteVideo');
+const remoteVideoBox = document.getElementById('remoteVideoBox');
 
 // Холст элементы
 const paintContainer = document.getElementById('paintContainer');
@@ -553,30 +554,18 @@ function tryToConnectAsHost() {
         log(`Successfully configured server. Node registered as Host with Room ID: ${id}`, "success");
         statusText.innerText = translations[currentLang].statusHostWait;
         
-        if (chatContainer) chatContainer.style.display = 'block';
-        if (paintContainer) paintContainer.style.display = 'block';
+        // Показываем интерфейс для Хоста заранее, чтобы он видел свой холст и чат
+        chatContainer.style.display = 'block';
+        paintContainer.style.display = 'block';
+        remoteVideoBox.style.opacity = '0.3'; // Затемняем окно гостя пока его нет
         
+        // --- ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: Показываем кнопку рестарта только Хосту ---
         const restartBtn = document.getElementById('globalRestartBtn');
         if (restartBtn) restartBtn.style.display = 'inline-block';
+        // --------------------------------------------------------------------
         
-        // ХОСТ НАЧИНАЕТ СЛУШАТЬ ЗВОНКИ ПРЯМО ТУТ:
-        peer.on('call', call => {
-            log(`Incoming call notification from remote Peer ID: ${call.peer}`, "info");
-            call.answer(localStream);
-            log(`Call answered. Local stream attached to back-end pipeline`, "success");
-
-            bindCallEvents(call);
-
-            call.on('stream', remoteStream => {
-                addMediaStream(call.peer, remoteStream);
-            });
-        });
-
-        // ХОСТ НАЧИНАЕТ СЛУШАТЬ ДАТА-КАНАЛ ПРЯМО ТУТ:
-        peer.on('connection', (dataConn) => {
-            log(`Incoming Data connection request from node: ${dataConn.peer}`, "info");
-            bindDataConnectionEvents(dataConn);
-        });
+        listenForCalls();
+        listenForDataConnections();
     });
     
     peer.on('error', (err) => {
@@ -599,6 +588,7 @@ function connectAsGuest() {
         log(`Guest handshake link operational. Local Peer ID: ${id}`, "success");
         statusText.innerText = translations[currentLang].statusGuestConnect;
         makeGuestCall();
+        listenForCalls();
         listenForDataConnections();
     });
 
@@ -631,6 +621,25 @@ function makeGuestCall() {
     }
 }
 
+function listenForCalls() {
+    peer.on('call', (call) => {
+        log(`Incoming call notification from remote Peer ID: ${call.peer}`, "info");
+        if (connectedPeers.has(call.peer)) {
+            log(`Call rejected: Stream target already linked inside connection set`, "info");
+            return;
+        }
+        call.answer(localStream);
+        log(`Call answered. Local stream attached to back-end pipeline`, "success");
+        bindCallEvents(call);
+    });
+}
+
+function listenForDataConnections() {
+    peer.on('connection', (dataConn) => {
+        log(`Incoming Data connection request from node: ${dataConn.peer}`, "info");
+        bindDataConnectionEvents(dataConn);
+    });
+}
 
 function bindCallEvents(call) {
     if (call.peerConnection) {
@@ -641,34 +650,15 @@ function bindCallEvents(call) {
             log(`WebRTC Engine ICE Transport State shift: -> "${state}"`, "info");
             
             if (state === 'connected') {
-    if (reconnectInterval) {
-        clearInterval(reconnectInterval);
-        reconnectInterval = null;
-    }
-    if (chatContainer) chatContainer.style.display = 'block';
-    if (paintContainer) paintContainer.style.display = 'block';
-	
-	if (!isHostMode) {
-                    peer.on('call', guestCall => {
-                        log(`Incoming mesh-call from neighbor peer: ${guestCall.peer}`, "info");
-                        guestCall.answer(localStream);
-                        bindCallEvents(guestCall);
-                        guestCall.on('stream', remoteStream => {
-                            addMediaStream(guestCall.peer, remoteStream);
-                        });
-                    });
-                    
-                    peer.on('connection', guestConn => {
-                        log(`Incoming mesh-data from neighbor peer: ${guestConn.peer}`, "info");
-                        bindDataConnectionEvents(guestConn);
-                    });
+                if (reconnectInterval) {
+                    clearInterval(reconnectInterval);
+                    reconnectInterval = null;
                 }
-    
-    // Если это хост — сохраняем его рабочий статус, если гость — пишем «Подключено!»
-    if (statusText) {
-        statusText.innerText = isHostMode ? translations[currentLang].statusHostWait : translations[currentLang].statusConnected;
-    }
-    log(`STUN/TURN network link resolved. Media tracks streaming actively with peer: ${call.peer}`, "success");
+                chatContainer.style.display = 'block';
+                paintContainer.style.display = 'block';
+                remoteVideoBox.style.opacity = '1.0';
+                statusText.innerText = translations[currentLang].statusConnected;
+                log(`STUN/TURN network link resolved. Media tracks streaming actively`, "success");
                 
                 if (drawingHistory.length > 0) {
                     log(`Syncing full drawing vector history database (${drawingHistory.length} lines) to new peer`, "info");
@@ -692,21 +682,15 @@ function bindCallEvents(call) {
         handlePeerDisconnect(call);
     });
 }
+
 function handlePeerDisconnect(call) {
     connectedPeers.delete(call.peer);
-    
-    // Удаляем блок видео конкретного отключившегося пользователя
-    const videoBox = document.getElementById(`video-box-${call.peer}`);
-    if (videoBox) {
-        videoBox.remove();
-        log(`Removed video node for disconnected peer: ${call.peer}`, "info");
-    }
+    remoteVideo.srcObject = null;
+    remoteVideoBox.style.opacity = '0.3';
     
     if (isHostMode) {
-        // Если это хост и кто-то остался, статус не меняем, если пусто — ждем
-        if (connectedPeers.size === 0) {
-            statusText.innerText = translations[currentLang].statusHostWait;
-        }
+        log(`Guest disconnected. Host session stays ACTIVE. Awaiting new connections...`, "success");
+        statusText.innerText = translations[currentLang].statusHostWait;
         appendChatMessage(translations[currentLang].systemLabel, `A user ${translations[currentLang].leftChat}`, '#f38ba8', true);
     } else {
         log(`Host lost. Guest mode auto-reconnection sequence armed.`, "error");
@@ -727,43 +711,7 @@ function bindDataConnectionEvents(dataConn) {
         if (data.type === 'system-intro') {
             log(`Peer introduced identity: "${data.name}"`, "info");
             appendChatMessage(translations[currentLang].systemLabel, `${data.name} ${translations[currentLang].joinedChat}`, '#f5c2e7', true);
-
-            // Обновляем подпись под видео конкретного гостя
-            const labelEl = document.getElementById(`label-${dataConn.peer}`);
-            if (labelEl) labelEl.innerText = data.name;
-
-            // ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: Хост уведомляет всех старых участников о новом госте
-            if (isHostMode) {
-                activeDataConnections.forEach(conn => {
-                    if (conn.peer !== dataConn.peer && conn.open) {
-                        conn.send({
-                            type: 'new-peer-alert',
-                            peerId: dataConn.peer
-                        });
-                    }
-                });
-            }
-        } 
-        // ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: ПРИЕМ УВЕДОМЛЕНИЯ ГОСТЕМ О НОВОМ УЧАСТНИКЕ
-        else if (data.type === 'new-peer-alert') {
-            log(`New room participant discovered via Host signaling: ${data.peerId}`, "info");
-            
-            // Гость звонит новому участнику напрямую
-            const call = peer.call(data.peerId, localStream);
-            if (call) {
-                bindCallEvents(call);
-                call.on('stream', remoteStream => {
-                    addMediaStream(data.peerId, remoteStream);
-                });
-            }
-            
-            // Гость открывает прямой дата-канал к новому участнику
-            const conn = peer.connect(data.peerId);
-            if (conn) {
-                bindDataConnectionEvents(conn);
-            }
-        }
-        else if (data.type === 'text-message') {
+        } else if (data.type === 'text-message') {
             appendChatMessage(data.sender, data.text, '#b4befe', false);
         }
         
@@ -797,7 +745,7 @@ function bindDataConnectionEvents(dataConn) {
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
             log("Canvas fully flushed via synchronization signal from peer", "info");
         } 
-        // ПРИЕМ СИГНАЛА РЕСТАРТА ОТ ХОСТА
+        // --- ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: ПРИЕМ СИГНАЛА РЕСТАРТА ОТ ХОСТА ---
         else if (data.type === 'remote-force-reload') {
             log("Получена команда принудительного перезапуска от хоста. Перезагрузка...", "error");
             setTimeout(() => {
@@ -866,66 +814,25 @@ function addMediaStream(peerId, stream) {
     if (connectedPeers.has(peerId)) return;
     connectedPeers.add(peerId);
 
-    // Ищем, нет ли уже созданного окна для этого гостя
-    let videoBox = document.getElementById(`video-box-${peerId}`);
+    remoteVideo.srcObject = stream;
     
-    if (!videoBox) {
-        // Создаем контейнер для нового гостя
-        videoBox = document.createElement('div');
-        videoBox.id = `video-box-${peerId}`;
-        videoBox.className = 'video-box remote';
-        
-        // Создаем элемент видео
-        const videoEl = document.createElement('video');
-        videoEl.autoplay = true;
-        videoEl.playsinline = true;
-        videoEl.srcObject = stream;
-        
-        // Зеркалим видео гостя (как настраивали ранее)
-        videoEl.style.transform = 'scaleX(-1)';
-        
-        // Создаем подпись под видео
-        const labelEl = document.createElement('div');
-        labelEl.className = 'video-label';
-        labelEl.id = `label-${peerId}`;
-        labelEl.innerText = translations[currentLang].lblPeer;
-        
-        // Собираем плитку воедино
-        videoBox.appendChild(videoEl);
-        videoBox.appendChild(labelEl);
-        remoteVideosContainer.appendChild(videoBox);
-        
-        // Запускаем воспроизведение видео
-        videoEl.play()
-            .then(() => {
-                log(`Audio/Video hardware playback pipe running at full capacity for: ${peerId}`, "success");
-                statusText.innerText = translations[currentLang].statusConnected;
-            })
-            .catch(e => {
-                log(`Media playback security block encountered for ${peerId}: Client action mandatory`, "error");
-                overlay.style.display = 'flex';
-            });
-    } else {
-        // Если контейнер уже был, просто обновляем поток внутри него
-        const videoEl = videoBox.querySelector('video');
-        if (videoEl) {
-            videoEl.srcObject = stream;
-            videoEl.play().catch(err => console.error(err));
-        }
-    }
+    remoteVideo.play()
+        .then(() => {
+            log(`Audio/Video hardware playback pipe running at full capacity`, "success");
+            statusText.innerText = translations[currentLang].statusConnected;
+        })
+        .catch(e => {
+            log(`Media playback security block encountered: Client action mandatory`, "error");
+            overlay.style.display = 'flex';
+        });
 }
 
 if (modalBtn) {
     modalBtn.addEventListener('click', () => {
         overlay.style.display = 'none';
-        
-        // При клике на оверлей принудительно стартуем видео ВСЕХ гостей в контейнере
-        const remoteVideos = remoteVideosContainer.querySelectorAll('video');
-        remoteVideos.forEach(videoEl => {
-            videoEl.play()
-                .then(() => statusText.innerText = translations[currentLang].statusConnected)
-                .catch(err => log(`Forced stream activation rejected: ${err.message}`, "error"));
-        });
+        remoteVideo.play()
+            .then(() => statusText.innerText = translations[currentLang].statusConnected)
+            .catch(err => log(`Forced stream activation rejected: ${err.message}`, "error"));
     });
 }
 
