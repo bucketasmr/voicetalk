@@ -591,14 +591,17 @@ function tryToConnectAsHost() {
     });
 }
 
-// Глобальная переменная для управления таймером
-let connectionRetryInterval = null;
+
 
 function connectAsGuest() {
     isHostMode = false;
     
-    // ... создание peer ...
-   peer = new Peer(MY_GUEST_ID, peerConfig);
+    // Если по какой-то причине объект peer еще жив — уничтожаем его
+    if (peer && !peer.destroyed) {
+        try { peer.destroy(); } catch(e){}
+    }
+
+    peer = new Peer(MY_GUEST_ID, peerConfig);
 
     peer.on('open', (id) => {
         isReconnecting = false; // Сбрасываем флаг — мы успешно в сети
@@ -607,37 +610,23 @@ function connectAsGuest() {
             reconnectInterval = null;
         }
         log(`Guest handshake link operational. Local Peer ID: ${id}`, "success");
-        makeGuestCall(); // Вызываем звонок
+        makeGuestCall(); 
     });
 
     peer.on('error', (err) => {
         log(`Guest network layer failure: ${err.type} - ${err.message}`, "error");
         
-        // Если хост недоступен или произошла ошибка сети — запускаем цикл попыток
-        if (err.type === 'peer-unavailable' || err.type === 'network') {
-            attemptReconnect();
+        // ВАЖНО: Проверьте, чтобы здесь у вас НЕ БЫЛО строки "Scheduling reconnection attempt in 3 seconds..."
+        if (err.type === 'peer-unavailable' || err.type === 'network' || err.type === 'disconnect') {
+            if (!isReconnecting) {
+                isReconnecting = true;
+                log(`Host unavailable. Arming 15s reconnection loop...`, "error");
+                startReconnectionLoop(null);
+            }
         }
     });
 }
 
-function attemptReconnect() {
-    log("Connection lost. Scheduling reconnection attempt in 3 seconds...", "info");
-    
-    if (connectionRetryInterval) clearInterval(connectionRetryInterval);
-    
-    connectionRetryInterval = setInterval(() => {
-        log("Reconnection timer pulse. Pinging host room node...", "info");
-        
-        // Уничтожаем старый инстанс, если он висел
-        if (peer) {
-            peer.destroy();
-            peer = null;
-        }
-        
-        // Снова вызываем функцию подключения
-        connectAsGuest();
-    }, 3000); // 3 секунды — оптимальный интервал
-}
 
 function makeGuestCall() {
     if (reconnectInterval) {
@@ -673,14 +662,19 @@ function bindCallEvents(call) {
             log(`WebRTC Engine ICE Transport State shift: -> "${state}"`, "info");
             
             if (state === 'connected') {
-    if (reconnectInterval) {
-        clearInterval(reconnectInterval);
-        reconnectInterval = null;
-    }
-    if (chatContainer) chatContainer.style.display = 'block';
-    if (paintContainer) paintContainer.style.display = 'block';
-	
-	if (!isHostMode) {
+                if (reconnectInterval) {
+                    clearInterval(reconnectInterval);
+                    reconnectInterval = null;
+                }
+                if (chatContainer) chatContainer.style.display = 'block';
+                if (paintContainer) paintContainer.style.display = 'block';
+                
+                // Навешиваем Mesh-слушатели только ОДИН раз, проверяя, что их еще нет
+                if (!isHostMode && peer) {
+                    // Очищаем старые дубли, если они были, чтобы избежать лавины звонков
+                    peer.off('call');
+                    peer.off('connection');
+
                     peer.on('call', guestCall => {
                         log(`Incoming mesh-call from neighbor peer: ${guestCall.peer}`, "info");
                         guestCall.answer(localStream);
@@ -696,17 +690,17 @@ function bindCallEvents(call) {
                     });
                 }
     
-    // Если это хост — сохраняем его рабочий статус, если гость — пишем «Подключено!»
-    if (statusText) {
-        statusText.innerText = isHostMode ? translations[currentLang].statusHostWait : translations[currentLang].statusConnected;
-    }
-    log(`STUN/TURN network link resolved. Media tracks streaming actively with peer: ${call.peer}`, "success");
+                if (statusText) {
+                    statusText.innerText = isHostMode ? translations[currentLang].statusHostWait : translations[currentLang].statusConnected;
+                }
+                log(`STUN/TURN network link resolved. Media tracks streaming actively with peer: ${call.peer}`, "success");
                 
                 if (drawingHistory.length > 0) {
                     log(`Syncing full drawing vector history database (${drawingHistory.length} lines) to new peer`, "info");
                     broadcastPaintData({ type: 'paint-sync-canvas', history: drawingHistory });
                 }
             }
+            
             if (state === 'disconnected' || state === 'failed') {
                 log(`WebRTC pipeline dropped state. Handling disconnection event safely...`, "error");
                 handlePeerDisconnect(call);
@@ -721,6 +715,11 @@ function bindCallEvents(call) {
     
     call.on('close', () => {
         log(`Stream call connection closed via signaling track event`, "info");
+        handlePeerDisconnect(call);
+    });
+
+    call.on('error', (err) => {
+        log(`Call-level WebRTC transport layer error: ${err.message}`, "error");
         handlePeerDisconnect(call);
     });
 }
@@ -755,9 +754,11 @@ function handlePeerDisconnect(call) {
 }
 
 function bindDataConnectionEvents(dataConn) {
+    // Сразу добавляем открывающееся соединение в наш рабочий Set
+    activeDataConnections.add(dataConn);
+
     dataConn.on('open', () => {
         log(`Data channel layer verified open with peer: ${dataConn.peer}`, "success");
-        activeDataConnections.add(dataConn);
         dataConn.send({ type: 'system-intro', name: myNickname });
     });
 
@@ -768,11 +769,9 @@ function bindDataConnectionEvents(dataConn) {
             log(`Peer introduced identity: "${data.name}"`, "info");
             appendChatMessage(translations[currentLang].systemLabel, `${data.name} ${translations[currentLang].joinedChat}`, '#f5c2e7', true);
 
-            // Обновляем подпись под видео конкретного гостя
             const labelEl = document.getElementById(`label-${dataConn.peer}`);
             if (labelEl) labelEl.innerText = data.name;
 
-            // ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: Хост уведомляет всех старых участников о новом госте
             if (isHostMode) {
                 activeDataConnections.forEach(conn => {
                     if (conn.peer !== dataConn.peer && conn.open) {
@@ -784,11 +783,9 @@ function bindDataConnectionEvents(dataConn) {
                 });
             }
         } 
-        // ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: ПРИЕМ УВЕДОМЛЕНИЯ ГОСТЕМ О НОВОМ УЧАСТНИКЕ
         else if (data.type === 'new-peer-alert') {
             log(`New room participant discovered via Host signaling: ${data.peerId}`, "info");
             
-            // Гость звонит новому участнику напрямую
             const call = peer.call(data.peerId, localStream);
             if (call) {
                 bindCallEvents(call);
@@ -797,7 +794,6 @@ function bindDataConnectionEvents(dataConn) {
                 });
             }
             
-            // Гость открывает прямой дата-канал к новому участнику
             const conn = peer.connect(data.peerId);
             if (conn) {
                 bindDataConnectionEvents(conn);
@@ -806,8 +802,6 @@ function bindDataConnectionEvents(dataConn) {
         else if (data.type === 'text-message') {
             appendChatMessage(data.sender, data.text, '#b4befe', false);
         }
-        
-        // Обработка синхронизации рисования холста
         else if (data.type === 'paint-live-draw') {
             if (!ctx) return;
             ctx.beginPath();
@@ -837,13 +831,41 @@ function bindDataConnectionEvents(dataConn) {
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
             log("Canvas fully flushed via synchronization signal from peer", "info");
         } 
-        // ПРИЕМ СИГНАЛА РЕСТАРТА ОТ ХОСТА
         else if (data.type === 'remote-force-reload') {
             log("Получена команда принудительного перезапуска от хоста. Перезагрузка...", "error");
             setTimeout(() => {
                 if (peer) peer.destroy();
                 location.reload();
             }, 500);
+        }
+    });
+
+    // ================= ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: ОБРАБОТКА ЗАКРЫТИЯ КАНАЛА =================
+    dataConn.on('close', () => {
+        log(`Data channel closed for peer: ${dataConn.peer}`, "info");
+        activeDataConnections.delete(dataConn); // Чистим память от закрытого пира
+        
+        // Если упала связь именно с ХОСТОМ, и мы гость — запускаем безопасный 15с реконнект
+        if (!isHostMode && dataConn.peer === ROOM_ID) {
+            if (!isReconnecting) {
+                isReconnecting = true;
+                log(`Host data link severed. Arming 15s reconnection loop...`, "error");
+                startReconnectionLoop(null);
+            }
+        }
+    });
+
+    // ================= ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: ОБРАБОТКА ОШИБОК КАНАЛА =================
+    dataConn.on('error', (err) => {
+        log(`Data channel layer error for peer ${dataConn.peer}: ${err.message}`, "error");
+        activeDataConnections.delete(dataConn);
+        
+        if (!isHostMode && dataConn.peer === ROOM_ID) {
+            if (!isReconnecting) {
+                isReconnecting = true;
+                log(`Host data link errored. Arming 15s reconnection loop...`, "error");
+                startReconnectionLoop(null);
+            }
         }
     });
 }
@@ -887,20 +909,32 @@ function escapeHTML(str) {
 }
 
 function startReconnectionLoop(call) {
-    if (reconnectInterval) clearInterval(reconnectInterval);
+    // Полная зачистка ЛЮБЫХ старых таймеров
+    if (reconnectInterval) {
+        clearInterval(reconnectInterval);
+        reconnectInterval = null;
+    }
+    
 
     log("Re-indexing master loop. Reconnection daemon spawned (interval 15s)...", "info");
 
     reconnectInterval = setInterval(() => {
         log("Reconnection timer pulse. Pinging host room node...", "info");
 
+        // Убиваем старый инстанс полностью перед созданием нового
         if (peer) {
-            try { peer.destroy(); } catch (e) { console.error(e); }
+            try { 
+                peer.off('open');
+                peer.off('error');
+                peer.off('call');
+                peer.off('connection');
+                peer.destroy(); 
+            } catch (e) { console.error(e); }
             peer = null;
         }
 
         connectAsGuest(); 
-    }, 15000); // 15 секунд — оптимально для стабилизации STUN/TURN
+    }, 15000); // 15 секунд
 }
 
 function addMediaStream(peerId, stream) {
