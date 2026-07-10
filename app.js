@@ -4,10 +4,12 @@ const MY_GUEST_ID = "guest-" + Math.random().toString(36).substring(2, 9);
 let peer = null;
 let localStream = null;
 let isMuted = false;
+let isCamFullyOff = false; // Отслеживание полного отключения камеры
 let currentFacingMode = "user"; 
 let reconnectInterval = null; 
 let myNickname = "User";
 let isHostMode = false; // Флаг определения роли
+let isReconnecting = false; // Добавьте этот флаг
 
 const connectedPeers = new Set();
 const activeDataConnections = new Set(); 
@@ -44,6 +46,8 @@ const translations = {
         btnCopied: "Copied!",
         btnMute: "Mute Mic",
         btnUnmute: "Unmute Mic",
+        btnCamOff: "Turn Cam Off", 
+        btnCamOn: "Turn Cam On",  
         namePrompt: "Enter your nickname to start:",
         namePlaceholder: "Your name...",
         chatPlaceholder: "Type a message...",
@@ -76,7 +80,9 @@ const translations = {
         btnCopy: "Скопіювати логи",
         btnCopied: "Скопійовано!",
         btnMute: "Вимкнути мік.",
-        btnUnmute: "Увімкнути мік." ,
+        btnUnmute: "Увімкнути мік.",
+        btnCamOff: "Вимкнути кам.",
+        btnCamOn: "Увімкнути кам.",
         namePrompt: "Введіть ваше ім'я для старту:",
         namePlaceholder: "Ваше ім'я...",
         chatPlaceholder: "Напишіть повідомлення...",
@@ -110,6 +116,8 @@ const translations = {
         btnCopied: "Скопировано!",
         btnMute: "Выключить мик.",
         btnUnmute: "Включить мик.",
+        btnCamOff: "Выключить кам.",
+        btnCamOn: "Включить кам.",
         namePrompt: "Введите ваше имя для старта:",
         namePlaceholder: "Ваше имя...",
         chatPlaceholder: "Напишите сообщение...",
@@ -130,6 +138,7 @@ let currentLang = 'en';
 // Поиск DOM элементов
 const joinBtn = document.getElementById('joinBtn');
 const muteBtn = document.getElementById('muteBtn');
+const camOffBtn = document.getElementById('camOffBtn');
 const flipCamBtn = document.getElementById('flipCamBtn');
 const statusText = document.getElementById('statusText');
 const logDiv = document.getElementById('log');
@@ -153,8 +162,7 @@ const logSection = document.getElementById('logSection');
 
 const videoGrid = document.getElementById('videoGrid');
 const localVideo = document.getElementById('localVideo');
-const remoteVideo = document.getElementById('remoteVideo');
-const remoteVideoBox = document.getElementById('remoteVideoBox');
+const remoteVideosContainer = document.getElementById('remoteVideosContainer');
 
 // Холст элементы
 const paintContainer = document.getElementById('paintContainer');
@@ -186,33 +194,43 @@ function changeLanguage(lang) {
     const targetBtn = document.getElementById(`btn-${lang}`);
     if (targetBtn) targetBtn.classList.add('active');
 
-    document.getElementById('txt-title').innerText = translations[lang].title;
-    document.getElementById('txt-badge').innerText = translations[lang].badge;
-    modalBtn.innerText = translations[lang].modalBtn;
-    modalTxt.innerText = translations[lang].modalText;
-    txtNamePrompt.innerText = translations[lang].namePrompt;
-    usernameInput.placeholder = translations[lang].namePlaceholder;
-    chatInput.placeholder = translations[lang].chatPlaceholder;
-    sendMsgBtn.innerText = translations[lang].chatSend;
-    document.getElementById('lbl-me').innerText = translations[lang].lblMe;
-    document.getElementById('lbl-peer').innerText = translations[lang].lblPeer;
-    clearBtn.innerText = translations[lang].btnClear;
+    if (document.getElementById('txt-title')) document.getElementById('txt-title').innerText = translations[lang].title;
+    if (document.getElementById('txt-badge')) document.getElementById('txt-badge').innerText = translations[lang].badge;
+    if (modalBtn) modalBtn.innerText = translations[lang].modalBtn;
+    if (modalTxt) modalTxt.innerText = translations[lang].modalText;
+    if (txtNamePrompt) txtNamePrompt.innerText = translations[lang].namePrompt;
+    if (usernameInput) usernameInput.placeholder = translations[lang].namePlaceholder;
+    if (chatInput) chatInput.placeholder = translations[lang].chatPlaceholder;
+    if (sendMsgBtn) sendMsgBtn.innerText = translations[lang].chatSend;
+    if (document.getElementById('lbl-me')) document.getElementById('lbl-me').innerText = translations[lang].lblMe;
+    if (document.getElementById('lbl-peer')) document.getElementById('lbl-peer').innerText = translations[lang].lblPeer;
+    if (clearBtn) clearBtn.innerText = translations[lang].btnClear;
     
-    if (logsVisible) {
-        toggleLogBtn.innerText = translations[lang].btnHideLog;
-    } else {
-        toggleLogBtn.innerText = translations[lang].btnShowLog;
+    // --- ИСПРАВЛЕННАЯ ЛОГИКА: Локализация и удержание видимости кнопки ---
+    const camOffBtnElement = document.getElementById('camOffBtn');
+    if (camOffBtnElement) {
+        camOffBtnElement.innerText = isCamFullyOff ? translations[lang].btnCamOn : translations[lang].btnCamOff;
+        
+        // Если стрим уже успешно захвачен, принудительно держим кнопку видимой при смене языка
+        if (localStream) {
+            camOffBtnElement.style.display = 'block';
+        }
+    }
+    // ---------------------------------------------------------------------
+    
+    if (toggleLogBtn) {
+        toggleLogBtn.innerText = logsVisible ? translations[lang].btnHideLog : translations[lang].btnShowLog;
     }
 
-    if (copyLogBtn.innerText !== translations.en.btnCopied && copyLogBtn.innerText !== translations.uk.btnCopied && copyLogBtn.innerText !== translations.ru.btnCopied) {
+    if (copyLogBtn && copyLogBtn.innerText !== translations.en.btnCopied && copyLogBtn.innerText !== translations.uk.btnCopied && copyLogBtn.innerText !== translations.ru.btnCopied) {
         copyLogBtn.innerText = translations[lang].btnCopy;
     }
     
-    if (!joinBtn.disabled) joinBtn.innerText = translations[lang].btnJoin;
-    if (isMuted) muteBtn.innerText = translations[lang].btnUnmute;
-    else muteBtn.innerText = translations[lang].btnMute;
+    if (joinBtn && !joinBtn.disabled) joinBtn.innerText = translations[lang].btnJoin;
+    if (muteBtn) {
+        muteBtn.innerText = isMuted ? translations[lang].btnUnmute : translations[lang].btnMute;
+    }
 }
-
 function detectDeviceLanguage() {
     const browserLang = navigator.language || navigator.userLanguage;
     const shortLang = browserLang.substring(0, 2).toLowerCase();
@@ -227,6 +245,7 @@ detectDeviceLanguage();
 function initCanvas() {
     log("Initializing Canvas element...", "info");
     canvas = document.getElementById('paintCanvas');
+    if (!canvas) return;
     ctx = canvas.getContext('2d');
     
     ctx.lineCap = 'round';
@@ -329,6 +348,7 @@ function convertHexToRGBA(hex, opacity) {
 }
 
 function redrawCanvas() {
+    if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     drawingHistory.forEach(stroke => {
@@ -345,31 +365,37 @@ function redrawCanvas() {
     });
 }
 
-undoBtn.addEventListener('click', () => {
-    if (drawingHistory.length === 0) return;
-    const popped = drawingHistory.pop();
-    redoStack.push(popped);
-    redrawCanvas();
-    log("Undo action executed", "info");
-    broadcastPaintData({ type: 'paint-undo' });
-});
+if (undoBtn) {
+    undoBtn.addEventListener('click', () => {
+        if (drawingHistory.length === 0) return;
+        const popped = drawingHistory.pop();
+        redoStack.push(popped);
+        redrawCanvas();
+        log("Undo action executed", "info");
+        broadcastPaintData({ type: 'paint-undo' });
+    });
+}
 
-redoBtn.addEventListener('click', () => {
-    if (redoStack.length === 0) return;
-    const popped = redoStack.pop();
-    drawingHistory.push(popped);
-    redrawCanvas();
-    log("Redo action executed", "info");
-    broadcastPaintData({ type: 'paint-redo', stroke: popped });
-});
+if (redoBtn) {
+    redoBtn.addEventListener('click', () => {
+        if (redoStack.length === 0) return;
+        const popped = redoStack.pop();
+        drawingHistory.push(popped);
+        redrawCanvas();
+        log("Redo action executed", "info");
+        broadcastPaintData({ type: 'paint-redo', stroke: popped });
+    });
+}
 
-clearBtn.addEventListener('click', () => {
-    drawingHistory = [];
-    redoStack = [];
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    log("Canvas cleared locally by user", "success");
-    broadcastPaintData({ type: 'paint-clear' });
-});
+if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+        drawingHistory = [];
+        redoStack = [];
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        log("Canvas cleared locally by user", "success");
+        broadcastPaintData({ type: 'paint-clear' });
+    });
+}
 
 function broadcastPaintData(data) {
     activeDataConnections.forEach(conn => {
@@ -379,29 +405,35 @@ function broadcastPaintData(data) {
     });
 }
 
-saveNameBtn.addEventListener('click', () => {
-    const value = usernameInput.value.trim();
-    if (value.length > 0) myNickname = value;
-    nameSetupOverlay.style.display = 'none';
-    log(`User identity locked: "${myNickname}"`, "success");
-    initCanvas();
-});
+if (saveNameBtn) {
+    saveNameBtn.addEventListener('click', () => {
+        const value = usernameInput.value.trim();
+        if (value.length > 0) myNickname = value;
+        nameSetupOverlay.style.display = 'none';
+        log(`User identity locked: "${myNickname}"`, "success");
+        initCanvas();
+    });
+}
 
-usernameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') saveNameBtn.click();
-});
+if (usernameInput) {
+    usernameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveNameBtn.click();
+    });
+}
 
-toggleLogBtn.addEventListener('click', () => {
-    logsVisible = !logsVisible;
-    if (logsVisible) {
-        logSection.style.display = 'block';
-        toggleLogBtn.innerText = translations[currentLang].btnHideLog;
-        logSection.scrollIntoView({ behavior: 'smooth' });
-    } else {
-        logSection.style.display = 'none';
-        toggleLogBtn.innerText = translations[currentLang].btnShowLog;
-    }
-});
+if (toggleLogBtn) {
+    toggleLogBtn.addEventListener('click', () => {
+        logsVisible = !logsVisible;
+        if (logsVisible) {
+            logSection.style.display = 'block';
+            toggleLogBtn.innerText = translations[currentLang].btnHideLog;
+            logSection.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            logSection.style.display = 'none';
+            toggleLogBtn.innerText = translations[currentLang].btnShowLog;
+        }
+    });
+}
 
 const peerConfig = {
     config: {
@@ -421,72 +453,79 @@ const peerConfig = {
     }
 };
 
-joinBtn.addEventListener('click', async () => {
-    joinBtn.disabled = true;
-    statusText.innerText = translations[currentLang].statusMicRequest;
-    log(`Requesting localized WebRTC hardware interface (Camera facingMode: ${currentFacingMode}, Resolution: 720p)...`, "info");
-    
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, 
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode } 
-        });
+if (joinBtn) {
+    joinBtn.addEventListener('click', async () => {
+        joinBtn.disabled = true;
+        statusText.innerText = translations[currentLang].statusMicRequest;
+        log(`Requesting localized WebRTC hardware interface (Camera facingMode: ${currentFacingMode}, Resolution: 720p)...`, "info");
         
-        log("Camera and Mic hardware streams grabbed successfully", "success");
-        localVideo.srcObject = localStream;
-        videoGrid.style.display = 'grid';
-        statusText.innerText = translations[currentLang].statusNetConnect;
-        
-        muteBtn.style.display = 'block';
-        flipCamBtn.style.display = 'block';
-        
-        tryToConnectAsHost();
-    } catch (err) {
-        log(`Media permissions crash: ${err.name} - ${err.message}`, "error");
-        statusText.innerText = translations[currentLang].micNeeded;
-        joinBtn.disabled = false;
-    }
-});
-
-muteBtn.addEventListener('click', () => {
-    if (!localStream) return;
-    isMuted = !isMuted;
-    localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
-    log(`Microphone track toggled. Muted state: ${isMuted}`, "info");
-    
-    if (isMuted) {
-        muteBtn.classList.add('muted');
-        muteBtn.innerText = translations[currentLang].btnUnmute;
-    } else {
-        muteBtn.classList.remove('muted');
-        muteBtn.innerText = translations[currentLang].btnMute;
-    }
-});
-
-flipCamBtn.addEventListener('click', async () => {
-    if (!localStream) return;
-    
-    currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-    log(`Executing camera switch -> facingMode: "${currentFacingMode}"`, "info");
-
-    try {
-        const tempStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }
-        });
-        
-        const newVideoTrack = tempStream.getVideoTracks()[0];
-        const oldVideoTrack = localStream.getVideoTracks()[0];
-        
-        localStream.removeTrack(oldVideoTrack);
-        oldVideoTrack.stop();
-        localStream.addTrack(newVideoTrack);
-        
-        if (currentFacingMode === "environment") {
-            document.querySelector('.video-box.local').style.transform = 'none';
-            localVideo.style.transform = 'none';
-        } else {
-            localVideo.style.transform = 'scaleX(-1)';
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, 
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode } 
+            });
+            
+  log("Camera and Mic hardware streams grabbed successfully", "success");
+            localVideo.srcObject = localStream;
+            videoGrid.style.display = 'grid';
+            statusText.innerText = translations[currentLang].statusNetConnect;
+            
+            if (muteBtn) muteBtn.style.display = 'block';
+            if (camOffBtn) camOffBtn.style.display = 'block'; // --- ТОЧЕЧНОЕ ДОБАВЛЕНИЕ ---
+            if (flipCamBtn) flipCamBtn.style.display = 'block';
+            
+            tryToConnectAsHost();
+        } catch (err) {
+            log(`Media permissions crash: ${err.name} - ${err.message}`, "error");
+            statusText.innerText = translations[currentLang].micNeeded;
+            joinBtn.disabled = false;
         }
+    });
+}
+
+if (muteBtn) {
+    muteBtn.addEventListener('click', () => {
+        if (!localStream) return;
+        isMuted = !isMuted;
+        localStream.getAudioTracks().forEach(track => track.enabled = !isMuted);
+        log(`Microphone track toggled. Muted state: ${isMuted}`, "info");
+        
+        if (isMuted) {
+            muteBtn.classList.add('muted');
+            muteBtn.innerText = translations[currentLang].btnUnmute;
+        } else {
+            muteBtn.classList.remove('muted');
+            muteBtn.innerText = translations[currentLang].btnMute;
+        }
+    });
+}
+
+if (flipCamBtn) {
+    flipCamBtn.addEventListener('click', async () => {
+        if (!localStream) return;
+        
+        currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+        log(`Executing camera switch -> facingMode: "${currentFacingMode}"`, "info");
+    
+        try {
+            const tempStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }
+            });
+            
+            const newVideoTrack = tempStream.getVideoTracks()[0];
+            const oldVideoTrack = localStream.getVideoTracks()[0];
+            
+            localStream.removeTrack(oldVideoTrack);
+            oldVideoTrack.stop();
+            localStream.addTrack(newVideoTrack);
+            
+/// Если камера фронтальная — зеркалим её, если задняя — показываем как есть
+        if (currentFacingMode === "user") {
+            localVideo.style.transform = 'scaleX(-1)';
+        } else {
+            localVideo.style.transform = 'none';
+        }
+        
         localVideo.srcObject = localStream;
 
         if (peer && peer.connections[ROOM_ID]) {
@@ -504,6 +543,7 @@ flipCamBtn.addEventListener('click', async () => {
         log(`Failed to hot-swap camera tracks: ${err.message}`, "error");
     }
 });
+}
 
 function tryToConnectAsHost() {
     log(`Attempting to bind global target node: "${ROOM_ID}"`, "info");
@@ -514,13 +554,30 @@ function tryToConnectAsHost() {
         log(`Successfully configured server. Node registered as Host with Room ID: ${id}`, "success");
         statusText.innerText = translations[currentLang].statusHostWait;
         
-        // Показываем интерфейс для Хоста заранее, чтобы он видел свой холст и чат
-        chatContainer.style.display = 'block';
-        paintContainer.style.display = 'block';
-        remoteVideoBox.style.opacity = '0.3'; // Затемняем окно гостя пока его нет
+        if (chatContainer) chatContainer.style.display = 'block';
+        if (paintContainer) paintContainer.style.display = 'block';
         
-        listenForCalls();
-        listenForDataConnections();
+        const restartBtn = document.getElementById('globalRestartBtn');
+        if (restartBtn) restartBtn.style.display = 'inline-block';
+        
+        // ХОСТ НАЧИНАЕТ СЛУШАТЬ ЗВОНКИ ПРЯМО ТУТ:
+        peer.on('call', call => {
+            log(`Incoming call notification from remote Peer ID: ${call.peer}`, "info");
+            call.answer(localStream);
+            log(`Call answered. Local stream attached to back-end pipeline`, "success");
+
+            bindCallEvents(call);
+
+            call.on('stream', remoteStream => {
+                addMediaStream(call.peer, remoteStream);
+            });
+        });
+
+        // ХОСТ НАЧИНАЕТ СЛУШАТЬ ДАТА-КАНАЛ ПРЯМО ТУТ:
+        peer.on('connection', (dataConn) => {
+            log(`Incoming Data connection request from node: ${dataConn.peer}`, "info");
+            bindDataConnectionEvents(dataConn);
+        });
     });
     
     peer.on('error', (err) => {
@@ -534,22 +591,52 @@ function tryToConnectAsHost() {
     });
 }
 
+// Глобальная переменная для управления таймером
+let connectionRetryInterval = null;
+
 function connectAsGuest() {
     isHostMode = false;
-    log(`Creating guest dynamic pointer: "${MY_GUEST_ID}"`, "info");
-    peer = new Peer(MY_GUEST_ID, peerConfig);
     
+    // ... создание peer ...
+   peer = new Peer(MY_GUEST_ID, peerConfig);
+
     peer.on('open', (id) => {
+        isReconnecting = false; // Сбрасываем флаг — мы успешно в сети
+        if (reconnectInterval) {
+            clearInterval(reconnectInterval);
+            reconnectInterval = null;
+        }
         log(`Guest handshake link operational. Local Peer ID: ${id}`, "success");
-        statusText.innerText = translations[currentLang].statusGuestConnect;
-        makeGuestCall();
-        listenForCalls();
-        listenForDataConnections();
+        makeGuestCall(); // Вызываем звонок
     });
 
     peer.on('error', (err) => {
-        log(`Guest network layer failure: ${err.message}`, "error");
+        log(`Guest network layer failure: ${err.type} - ${err.message}`, "error");
+        
+        // Если хост недоступен или произошла ошибка сети — запускаем цикл попыток
+        if (err.type === 'peer-unavailable' || err.type === 'network') {
+            attemptReconnect();
+        }
     });
+}
+
+function attemptReconnect() {
+    log("Connection lost. Scheduling reconnection attempt in 3 seconds...", "info");
+    
+    if (connectionRetryInterval) clearInterval(connectionRetryInterval);
+    
+    connectionRetryInterval = setInterval(() => {
+        log("Reconnection timer pulse. Pinging host room node...", "info");
+        
+        // Уничтожаем старый инстанс, если он висел
+        if (peer) {
+            peer.destroy();
+            peer = null;
+        }
+        
+        // Снова вызываем функцию подключения
+        connectAsGuest();
+    }, 3000); // 3 секунды — оптимальный интервал
 }
 
 function makeGuestCall() {
@@ -576,25 +663,6 @@ function makeGuestCall() {
     }
 }
 
-function listenForCalls() {
-    peer.on('call', (call) => {
-        log(`Incoming call notification from remote Peer ID: ${call.peer}`, "info");
-        if (connectedPeers.has(call.peer)) {
-            log(`Call rejected: Stream target already linked inside connection set`, "info");
-            return;
-        }
-        call.answer(localStream);
-        log(`Call answered. Local stream attached to back-end pipeline`, "success");
-        bindCallEvents(call);
-    });
-}
-
-function listenForDataConnections() {
-    peer.on('connection', (dataConn) => {
-        log(`Incoming Data connection request from node: ${dataConn.peer}`, "info");
-        bindDataConnectionEvents(dataConn);
-    });
-}
 
 function bindCallEvents(call) {
     if (call.peerConnection) {
@@ -605,15 +673,34 @@ function bindCallEvents(call) {
             log(`WebRTC Engine ICE Transport State shift: -> "${state}"`, "info");
             
             if (state === 'connected') {
-                if (reconnectInterval) {
-                    clearInterval(reconnectInterval);
-                    reconnectInterval = null;
+    if (reconnectInterval) {
+        clearInterval(reconnectInterval);
+        reconnectInterval = null;
+    }
+    if (chatContainer) chatContainer.style.display = 'block';
+    if (paintContainer) paintContainer.style.display = 'block';
+	
+	if (!isHostMode) {
+                    peer.on('call', guestCall => {
+                        log(`Incoming mesh-call from neighbor peer: ${guestCall.peer}`, "info");
+                        guestCall.answer(localStream);
+                        bindCallEvents(guestCall);
+                        guestCall.on('stream', remoteStream => {
+                            addMediaStream(guestCall.peer, remoteStream);
+                        });
+                    });
+                    
+                    peer.on('connection', guestConn => {
+                        log(`Incoming mesh-data from neighbor peer: ${guestConn.peer}`, "info");
+                        bindDataConnectionEvents(guestConn);
+                    });
                 }
-                chatContainer.style.display = 'block';
-                paintContainer.style.display = 'block';
-                remoteVideoBox.style.opacity = '1.0';
-                statusText.innerText = translations[currentLang].statusConnected;
-                log(`STUN/TURN network link resolved. Media tracks streaming actively`, "success");
+    
+    // Если это хост — сохраняем его рабочий статус, если гость — пишем «Подключено!»
+    if (statusText) {
+        statusText.innerText = isHostMode ? translations[currentLang].statusHostWait : translations[currentLang].statusConnected;
+    }
+    log(`STUN/TURN network link resolved. Media tracks streaming actively with peer: ${call.peer}`, "success");
                 
                 if (drawingHistory.length > 0) {
                     log(`Syncing full drawing vector history database (${drawingHistory.length} lines) to new peer`, "info");
@@ -637,19 +724,33 @@ function bindCallEvents(call) {
         handlePeerDisconnect(call);
     });
 }
-
 function handlePeerDisconnect(call) {
     connectedPeers.delete(call.peer);
-    remoteVideo.srcObject = null;
-    remoteVideoBox.style.opacity = '0.3';
+    
+    // Удаляем видео
+    const videoBox = document.getElementById(`video-box-${call.peer}`);
+    if (videoBox) {
+        videoBox.remove();
+        log(`Removed video node for disconnected peer: ${call.peer}`, "info");
+    }
+    
+    // Очистка дата-канала (критично для стабильности сети)
+    activeDataConnections.forEach(conn => {
+        if (conn.peer === call.peer) activeDataConnections.delete(conn);
+    });
     
     if (isHostMode) {
-        log(`Guest disconnected. Host session stays ACTIVE. Awaiting new connections...`, "success");
-        statusText.innerText = translations[currentLang].statusHostWait;
+        if (connectedPeers.size === 0) {
+            statusText.innerText = translations[currentLang].statusHostWait;
+        }
         appendChatMessage(translations[currentLang].systemLabel, `A user ${translations[currentLang].leftChat}`, '#f38ba8', true);
     } else {
-        log(`Host lost. Guest mode auto-reconnection sequence armed.`, "error");
-        startReconnectionLoop(call);
+        // Запуск реконнекта с проверкой флага
+        if (!isReconnecting) {
+            isReconnecting = true; 
+            log(`Host lost. Guest mode auto-reconnection sequence armed.`, "error");
+            startReconnectionLoop(call);
+        }
     }
 }
 
@@ -666,12 +767,49 @@ function bindDataConnectionEvents(dataConn) {
         if (data.type === 'system-intro') {
             log(`Peer introduced identity: "${data.name}"`, "info");
             appendChatMessage(translations[currentLang].systemLabel, `${data.name} ${translations[currentLang].joinedChat}`, '#f5c2e7', true);
-        } else if (data.type === 'text-message') {
+
+            // Обновляем подпись под видео конкретного гостя
+            const labelEl = document.getElementById(`label-${dataConn.peer}`);
+            if (labelEl) labelEl.innerText = data.name;
+
+            // ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: Хост уведомляет всех старых участников о новом госте
+            if (isHostMode) {
+                activeDataConnections.forEach(conn => {
+                    if (conn.peer !== dataConn.peer && conn.open) {
+                        conn.send({
+                            type: 'new-peer-alert',
+                            peerId: dataConn.peer
+                        });
+                    }
+                });
+            }
+        } 
+        // ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: ПРИЕМ УВЕДОМЛЕНИЯ ГОСТЕМ О НОВОМ УЧАСТНИКЕ
+        else if (data.type === 'new-peer-alert') {
+            log(`New room participant discovered via Host signaling: ${data.peerId}`, "info");
+            
+            // Гость звонит новому участнику напрямую
+            const call = peer.call(data.peerId, localStream);
+            if (call) {
+                bindCallEvents(call);
+                call.on('stream', remoteStream => {
+                    addMediaStream(data.peerId, remoteStream);
+                });
+            }
+            
+            // Гость открывает прямой дата-канал к новому участнику
+            const conn = peer.connect(data.peerId);
+            if (conn) {
+                bindDataConnectionEvents(conn);
+            }
+        }
+        else if (data.type === 'text-message') {
             appendChatMessage(data.sender, data.text, '#b4befe', false);
         }
         
         // Обработка синхронизации рисования холста
         else if (data.type === 'paint-live-draw') {
+            if (!ctx) return;
             ctx.beginPath();
             ctx.strokeStyle = convertHexToRGBA(data.color, data.opacity);
             ctx.lineWidth = data.size;
@@ -696,14 +834,17 @@ function bindDataConnectionEvents(dataConn) {
         } else if (data.type === 'paint-clear') {
             drawingHistory = [];
             redoStack = [];
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
             log("Canvas fully flushed via synchronization signal from peer", "info");
+        } 
+        // ПРИЕМ СИГНАЛА РЕСТАРТА ОТ ХОСТА
+        else if (data.type === 'remote-force-reload') {
+            log("Получена команда принудительного перезапуска от хоста. Перезагрузка...", "error");
+            setTimeout(() => {
+                if (peer) peer.destroy();
+                location.reload();
+            }, 500);
         }
-    });
-
-    dataConn.on('close', () => {
-        log(`Data sync channel closed for node: ${dataConn.peer}`, "info");
-        activeDataConnections.delete(dataConn);
     });
 }
 
@@ -721,10 +862,12 @@ function sendTextMessage() {
     });
 }
 
-sendMsgBtn.addEventListener('click', sendTextMessage);
-chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendTextMessage();
-});
+if (sendMsgBtn) sendMsgBtn.addEventListener('click', sendTextMessage);
+if (chatInput) {
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendTextMessage();
+    });
+}
 
 function appendChatMessage(sender, text, nameColor = '#a6e3a1', isSystem = false) {
     const msgElement = document.createElement('div');
@@ -733,64 +876,173 @@ function appendChatMessage(sender, text, nameColor = '#a6e3a1', isSystem = false
     } else {
         msgElement.innerHTML = `<strong style="color: ${nameColor}">${sender}:</strong> <span style="color: #cdd6f4;">${escapeHTML(text)}</span>`;
     }
-    chatMessages.appendChild(msgElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (chatMessages) {
+        chatMessages.appendChild(msgElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 }
 
 function escapeHTML(str) {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-function startReconnectionLoop(currentCall) {
-    if (currentCall) currentCall.close();
-    connectedPeers.delete(ROOM_ID);
-    
-    if (isHostMode) return; // Хост никогда не входит в бесконечный цикл реконнекта сам к себе
-    
-    if (reconnectInterval) return; 
+function startReconnectionLoop(call) {
+    if (reconnectInterval) clearInterval(reconnectInterval);
 
-    log("Re-indexing master loop. Reconnection daemon spawned...", "info");
-    statusText.innerText = translations[currentLang].statusReconnecting;
+    log("Re-indexing master loop. Reconnection daemon spawned (interval 15s)...", "info");
+
     reconnectInterval = setInterval(() => {
         log("Reconnection timer pulse. Pinging host room node...", "info");
-        makeGuestCall();
-    }, 4000);
+
+        if (peer) {
+            try { peer.destroy(); } catch (e) { console.error(e); }
+            peer = null;
+        }
+
+        connectAsGuest(); 
+    }, 15000); // 15 секунд — оптимально для стабилизации STUN/TURN
 }
 
 function addMediaStream(peerId, stream) {
     if (connectedPeers.has(peerId)) return;
     connectedPeers.add(peerId);
 
-    remoteVideo.srcObject = stream;
+    // Ищем, нет ли уже созданного окна для этого гостя
+    let videoBox = document.getElementById(`video-box-${peerId}`);
     
-    remoteVideo.play()
-        .then(() => {
-            log(`Audio/Video hardware playback pipe running at full capacity`, "success");
-            statusText.innerText = translations[currentLang].statusConnected;
-        })
-        .catch(e => {
-            log(`Media playback security block encountered: Client action mandatory`, "error");
-            overlay.style.display = 'flex';
-        });
+    if (!videoBox) {
+        // Создаем контейнер для нового гостя
+        videoBox = document.createElement('div');
+        videoBox.id = `video-box-${peerId}`;
+        videoBox.className = 'video-box remote';
+        
+        // Создаем элемент видео
+        const videoEl = document.createElement('video');
+        videoEl.autoplay = true;
+        videoEl.playsinline = true;
+        videoEl.srcObject = stream;
+        
+        // Зеркалим видео гостя (как настраивали ранее)
+        videoEl.style.transform = 'scaleX(-1)';
+        
+        // Создаем подпись под видео
+        const labelEl = document.createElement('div');
+        labelEl.className = 'video-label';
+        labelEl.id = `label-${peerId}`;
+        labelEl.innerText = translations[currentLang].lblPeer;
+        
+        // Собираем плитку воедино
+        videoBox.appendChild(videoEl);
+        videoBox.appendChild(labelEl);
+        remoteVideosContainer.appendChild(videoBox);
+        
+        // Запускаем воспроизведение видео
+        videoEl.play()
+            .then(() => {
+                log(`Audio/Video hardware playback pipe running at full capacity for: ${peerId}`, "success");
+                statusText.innerText = translations[currentLang].statusConnected;
+            })
+            .catch(e => {
+                log(`Media playback security block encountered for ${peerId}: Client action mandatory`, "error");
+                overlay.style.display = 'flex';
+            });
+    } else {
+        // Если контейнер уже был, просто обновляем поток внутри него
+        const videoEl = videoBox.querySelector('video');
+        if (videoEl) {
+            videoEl.srcObject = stream;
+            videoEl.play().catch(err => console.error(err));
+        }
+    }
 }
 
-modalBtn.addEventListener('click', () => {
-    overlay.style.display = 'none';
-    remoteVideo.play()
-        .then(() => statusText.innerText = translations[currentLang].statusConnected)
-        .catch(err => log(`Forced stream activation rejected: ${err.message}`, "error"));
-});
+if (modalBtn) {
+    modalBtn.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        
+        // При клике на оверлей принудительно стартуем видео ВСЕХ гостей в контейнере
+        const remoteVideos = remoteVideosContainer.querySelectorAll('video');
+        remoteVideos.forEach(videoEl => {
+            videoEl.play()
+                .then(() => statusText.innerText = translations[currentLang].statusConnected)
+                .catch(err => log(`Forced stream activation rejected: ${err.message}`, "error"));
+        });
+    });
+}
 
-copyLogBtn.addEventListener('click', () => {
-    const textToCopy = logDiv.innerText || logDiv.textContent;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(textToCopy)
-            .then(() => showCopiedFeedback())
-            .catch(err => fallbackCopyText(textToCopy));
-    } else {
-        fallbackCopyText(textToCopy);
-    }
-});
+if (copyLogBtn) {
+    copyLogBtn.addEventListener('click', () => {
+        const textToCopy = logDiv.innerText || logDiv.textContent;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => showCopiedFeedback())
+                .catch(err => fallbackCopyText(textToCopy));
+        } else {
+            fallbackCopyText(textToCopy);
+        }
+    });
+}
+
+// ========================================================
+// ТОЧЕЧНОЕ ДОБАВЛЕНИЕ: УПРАВЛЕНИЕ КАМЕРОЙ И ГЛОБАЛЬНЫЙ РЕСТАРТ
+// ========================================================
+
+// 1. Обработчик полного отключения видеотрека камеры
+if (camOffBtn) {
+    camOffBtn.addEventListener('click', () => {
+        if (!localStream) return;
+        
+        isCamFullyOff = !isCamFullyOff;
+        
+        // Отключаем/включаем только видеотреки внутри нашего локального стрима
+        localStream.getVideoTracks().forEach(track => {
+            track.enabled = !isCamFullyOff;
+        });
+
+        // Меняем внешний вид кнопки и подтягиваем текст из словаря translations
+        if (isCamFullyOff) {
+            camOffBtn.style.background = '#f38ba8';
+            camOffBtn.style.color = '#11111b';
+            camOffBtn.innerText = translations[currentLang].btnCamOn; // Берет перевод "Включить кам." / "Turn Cam On"
+            log("Видеопоток вашей камеры остановлен.", "warn");
+        } else {
+            camOffBtn.style.background = '';
+            camOffBtn.style.color = '';
+            camOffBtn.innerText = translations[currentLang].btnCamOff; // Берет перевод "Выключить кам." / "Turn Cam Off"
+            log("Видеопоток вашей камеры восстановлен.", "success");
+        }
+    });
+}
+
+// 2. Обработчик отправки команды рестарта (доступен только для Хоста)
+const globalRestartBtn = document.getElementById('globalRestartBtn');
+if (globalRestartBtn) {
+    globalRestartBtn.addEventListener('click', () => {
+        const confirmRestart = confirm("Вы уверены, что хотите принудительно перезагрузить страницу у ВСЕХ участников?");
+        if (!confirmRestart) return;
+
+        log("Отправка сигнала глобального перезапуска всем участникам...", "warn");
+
+        // Перебираем твой Set активных подключений: activeDataConnections
+        activeDataConnections.forEach(conn => {
+            if (conn.open) {
+                try {
+                    conn.send({ type: "remote-force-reload" });
+                } catch(e) {
+                    console.error("Не удалось отправить сигнал рестарта пиру:", e);
+                }
+            }
+        });
+
+        // Перезагружаем самого хоста с небольшой задержкой, чтобы пакеты успели уйти в сеть
+        setTimeout(() => {
+            if (peer) peer.destroy();
+            location.reload();
+        }, 800);
+    });
+}
+
+// ========================================================
 
 function fallbackCopyText(text) {
     const textArea = document.createElement("textarea");
@@ -809,6 +1061,7 @@ function fallbackCopyText(text) {
 }
 
 function showCopiedFeedback() {
+    if (!copyLogBtn) return;
     copyLogBtn.innerText = translations[currentLang].btnCopied;
     copyLogBtn.style.borderColor = '#a6e3a1';
     copyLogBtn.style.color = '#a6e3a1';
