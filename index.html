@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Audio, Video & Paint Group Room</title>
+    <title>Global Audio, Video & Paint Room</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -16,524 +16,347 @@
             min-height: 100vh;
             margin: 0;
             padding: 20px;
-            box-sizing: border-box;
         }
         .card {
             background: #1e1e2e;
             padding: 30px;
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            max-width: 950px;
+            max-width: 500px;
             width: 100%;
             text-align: center;
             border: 1px solid #313244;
             position: relative;
-            box-sizing: border-box;
         }
         .lang-switcher {
             position: absolute;
             top: 15px;
             right: 15px;
-            display: flex;
-            gap: 6px;
         }
         .lang-btn {
             background: #313244;
-            border: 1px solid #45475a;
             color: #cdd6f4;
+            border: 1px solid #45475a;
             padding: 4px 8px;
-            border-radius: 6px;
             cursor: pointer;
+            border-radius: 4px;
             font-size: 12px;
-            transition: background 0.2s;
+            margin-left: 2px;
+            font-weight: bold;
         }
         .lang-btn.active {
-            background: #cba6f7;
+            background: #f5c2e7;
             color: #11111b;
-            border-color: #cba6f7;
+            border-color: #f5c2e7;
         }
-        h1 {
-            color: #cba6f7;
-            margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
+        h1 { margin-top: 15px; color: #a6e3a1; font-size: 24px; }
         .room-badge {
-            display: inline-block;
             background: #313244;
-            padding: 6px 14px;
+            color: #f5c2e7;
+            padding: 5px 12px;
             border-radius: 20px;
             font-size: 14px;
-            color: #a6adc8;
-            margin-bottom: 25px;
-            border: 1px solid #45475a;
-        }
-        .nickname-container {
+            font-weight: bold;
+            display: inline-block;
             margin-bottom: 20px;
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            align-items: center;
         }
-        .nickname-input {
-            background: #313244;
-            border: 1px solid #45475a;
-            color: #cdd6f4;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 16px;
-            outline: none;
-            width: 200px;
-            text-align: center;
-        }
-        .btn-join {
+        button.main-btn {
             background: #a6e3a1;
             color: #11111b;
             border: none;
-            padding: 12px 30px;
-            border-radius: 8px;
+            padding: 14px 24px;
             font-size: 16px;
             font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 14px rgba(166,227,161,0.3);
-            transition: transform 0.1s, opacity 0.2s;
-        }
-        .btn-join:active {
-            transform: scale(0.98);
-        }
-        .btn-join:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .status-container {
-            margin-top: 15px;
-            font-size: 14px;
-            color: #fab387;
-            min-height: 20px;
-        }
-        .media-controls {
-            margin-top: 20px;
-            display: none;
-            gap: 10px;
-            justify-content: center;
-        }
-        .control-btn {
-            background: #313244;
-            border: 1px solid #45475a;
-            color: #cdd6f4;
-            padding: 10px 20px;
             border-radius: 8px;
-            font-size: 14px;
             cursor: pointer;
+            width: 100%;
+            transition: transform 0.1s, background 0.2s;
+        }
+        button.main-btn:hover { background: #94e2d5; }
+        button.main-btn:active { transform: scale(0.98); }
+        button.main-btn:disabled { background: #585b70; color: #a6adc8; cursor: not-allowed; }
+        
+        .media-controls {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: background 0.2s;
+            gap: 10px;
+            margin-top: 12px;
         }
-        .control-btn:hover {
-            background: #45475a;
-        }
-        .control-btn.active-off {
-            background: #f38ba8;
-            color: #11111b;
-            border-color: #f38ba8;
-        }
-        .video-grid-wrapper {
-            margin-top: 25px;
-            background: #11111b;
-            border-radius: 12px;
-            padding: 15px;
-            border: 1px solid #313244;
+        .media-btn {
             display: none;
+            flex: 1;
+            background: #f9e2af;
+            color: #11111b;
+            border: none;
+            padding: 12px 10px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
         }
+        .media-btn:active { transform: scale(0.98); }
+        .media-btn.muted { background: #f38ba8; }
+        #flipCamBtn { background: #89b4fa; color: #11111b; }
+
+        .status {
+            font-size: 15px;
+            color: #bac2de;
+            margin: 20px 0;
+            min-height: 22px;
+        }
+
+        /* Видео контейнеры */
         .video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 15px;
-            justify-content: center;
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
         }
-        .video-container {
-            position: relative;
-            background: #1e1e2e;
+        .video-box {
+            background: #11111b;
+            border: 1px solid #313244;
             border-radius: 8px;
             overflow: hidden;
-            border: 2px solid #45475a;
             aspect-ratio: 4/3;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: border-color 0.3s;
+            position: relative;
         }
-        .video-container.speaking {
-            border-color: #a6e3a1;
-            box-shadow: 0 0 12px rgba(166,227,161,0.5);
-        }
-        video {
+        .video-box video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            background: #11111b;
+        }
+        .video-box.local video {
+            transform: scaleX(-1); /* Зеркалим локальную вебку */
         }
         .video-label {
             position: absolute;
-            bottom: 8px;
-            left: 8px;
-            background: rgba(17,17,27,0.75);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
+            bottom: 5px;
+            left: 5px;
+            background: rgba(17, 17, 27, 0.7);
             color: #cdd6f4;
-            z-index: 2;
-            pointer-events: none;
-        }
-        .host-badge {
-            color: #fab387;
-            font-weight: bold;
-            margin-right: 4px;
-        }
-        .kick-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #f38ba8;
-            color: #11111b;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 2px 6px;
             font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 3;
-            display: none;
-        }
-        .host-panel {
-            margin-top: 20px;
-            background: #181825;
-            border: 1px solid #f38ba8;
-            border-radius: 8px;
-            padding: 12px;
-            display: none;
-            text-align: left;
-            box-sizing: border-box;
-        }
-        .host-panel h3 {
-            margin-top: 0;
-            color: #f38ba8;
-            font-size: 16px;
-            margin-bottom: 8px;
-        }
-        .host-user-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0;
-            border-bottom: 1px solid #313244;
-        }
-        .host-user-row:last-child {
-            border-bottom: none;
-        }
-        .host-kick-inline-btn {
-            background: #f38ba8;
-            color: #11111b;
-            border: none;
-            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
         }
-        .split-layout {
-            display: none;
-            margin-top: 25px;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        @media(max-width: 768px) {
-            .split-layout {
-                grid-template-columns: 1fr;
-            }
-        }
+
+        /* Стили текстового чата */
         .chat-container {
-            background: #11111b;
-            border-radius: 12px;
+            display: none;
+            margin-top: 15px;
             border: 1px solid #313244;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            height: 380px;
-            box-sizing: border-box;
+            border-radius: 8px;
+            background: #11111b;
+            padding: 12px;
+            text-align: left;
         }
         .chat-messages {
-            flex: 1;
+            height: 120px;
             overflow-y: auto;
-            background: #1e1e2e;
-            border-radius: 8px;
-            padding: 10px;
-            text-align: left;
-            font-size: 14px;
-            border: 1px solid #313244;
-            margin-bottom: 10px;
-        }
-        .chat-msg-item {
-            margin-bottom: 8px;
-            line-height: 1.4;
-            word-break: break-word;
-        }
-        .chat-msg-user {
-            color: #cba6f7;
-            font-weight: bold;
-        }
-        .chat-input-row {
-            display: flex;
-            gap: 8px;
-        }
-        #chatInput {
-            flex: 1;
-            background: #313244;
-            border: 1px solid #45475a;
+            font-size: 13px;
             color: #cdd6f4;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            outline: none;
-        }
-        .chat-send-btn {
-            background: #89b4fa;
-            color: #11111b;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .paint-container {
-            background: #11111b;
-            border-radius: 12px;
-            border: 1px solid #313244;
-            padding: 15px;
+            margin-bottom: 10px;
             display: flex;
             flex-direction: column;
-            height: 380px;
-            box-sizing: border-box;
-            align-items: center;
+            gap: 6px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .chat-input-row { display: flex; gap: 8px; }
+        .chat-input-row input {
+            flex: 1; padding: 8px 12px; border-radius: 6px;
+            border: 1px solid #45475a; background: #1e1e2e;
+            color: #cdd6f4; font-size: 13px;
+        }
+        .chat-input-row input:focus { outline: none; border-color: #f5c2e7; }
+        .chat-send-btn {
+            background: #f5c2e7; color: #11111b; border: none;
+            padding: 0 16px; border-radius: 6px; font-weight: bold;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .chat-send-btn:hover { background: #eba0b8; }
+
+        /* Секция совместного рисования */
+        .paint-container {
+            display: none;
+            margin-top: 15px;
+            border: 1px solid #313244;
+            border-radius: 8px;
+            background: #11111b;
+            padding: 12px;
         }
         .paint-toolbar {
             display: flex;
-            justify-content: space-between;
-            width: 100%;
-            margin-bottom: 10px;
-            gap: 5px;
             flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            background: #1e1e2e;
+            padding: 8px;
+            border-radius: 6px;
         }
         .tool-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            font-size: 12px;
+            color: #bac2de;
         }
-        .paint-toolbar input[type="color"] {
-            background: none;
+        .tool-group input[type="color"] {
             border: none;
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
             cursor: pointer;
-            padding: 0;
+            background: transparent;
         }
-        .paint-toolbar input[type="range"] {
-            width: 70px;
-            accent-color: #cba6f7;
+        .tool-group input[type="range"] {
+            width: 60px;
+            cursor: pointer;
         }
         .history-btn {
             background: #313244;
-            border: 1px solid #45475a;
             color: #cdd6f4;
-            padding: 4px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .clear-btn {
-            background: #f38ba8;
-            color: #11111b;
-            border: none;
-            font-weight: bold;
-        }
-        canvas {
-            background: #1e1e2e;
-            border-radius: 8px;
-            border: 1px solid #313244;
-            cursor: crosshair;
-            width: 100%;
-            flex: 1;
-            touch-action: none;
-        }
-        .toggle-log-btn {
-            background: #313244;
             border: 1px solid #45475a;
-            color: #a6adc8;
-            padding: 6px 16px;
-            border-radius: 6px;
-            font-size: 13px;
-            margin-top: 20px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .toggle-log-btn:hover {
-            background: #45475a;
-        }
-        .log-section {
-            display: none;
-            margin-top: 15px;
-            width: 100%;
-            background: #11111b;
-            border-radius: 10px;
-            padding: 12px;
-            border: 1px solid #313244;
-            box-sizing: border-box;
-        }
-        .log-toolbar {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 6px;
-        }
-        .copy-log-btn {
-            background: #45475a;
-            border: none;
-            color: #cdd6f4;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-        .copy-log-btn:hover {
-            background: #585b70;
-        }
-        .log-output {
-            max-height: 150px;
-            overflow-y: auto;
-            text-align: left;
-            font-family: monospace;
+            padding: 4px 6px;
             font-size: 12px;
-            white-space: pre-wrap;
-            color: #a6e3a1;
-            line-height: 1.4;
-        }
-        .audio-blocker-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(17,17,27,0.95);
-            z-index: 9999;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            box-sizing: border-box;
-            text-align: center;
-        }
-        .audio-blocker-btn {
-            background: #f38ba8;
-            color: #11111b;
-            font-size: 18px;
-            font-weight: bold;
-            border: none;
-            padding: 15px 40px;
-            border-radius: 8px;
+            border-radius: 4px;
             cursor: pointer;
-            margin-top: 20px;
-            box-shadow: 0 4px 14px rgba(243,139,168,0.4);
+            font-weight: bold;
         }
+        .history-btn:hover { background: #45475a; }
+        .history-btn.clear-btn { background: #f38ba8; color: #11111b; border-color: #f38ba8; }
+        .history-btn.clear-btn:hover { background: #eba0b8; }
+        
+        #paintCanvas {
+            background: #ffffff;
+            border-radius: 6px;
+            cursor: crosshair;
+            display: block;
+            touch-action: none;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Консоль логов */
+        .log-container { display: none; margin-top: 15px; text-align: right; }
+        .copy-btn, .toggle-log-btn {
+            background: #313244; color: #f5e0dc; border: 1px solid #45475a;
+            padding: 6px 12px; font-size: 12px; border-radius: 6px;
+            cursor: pointer; margin-bottom: 6px; font-weight: 500;
+        }
+        .toggle-log-btn { width: 100%; margin-top: 12px; padding: 10px; font-size: 13px; }
+        #log {
+            background: #11111b; padding: 12px; border-radius: 8px;
+            height: 150px; overflow-y: auto; font-size: 11px;
+            text-align: left; color: #f5e0dc; font-family: monospace;
+            border: 1px solid #313244; white-space: pre-wrap; word-break: break-all;
+        }
+        
+        .audio-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(17, 17, 27, 0.9); backdrop-filter: blur(6px);
+            z-index: 9999; justify-content: center; align-items: center;
+        }
+        .audio-modal {
+            background: #313244; padding: 25px 35px; border-radius: 12px;
+            border: 2px solid #f5c2e7; text-align: center; max-width: 320px; width: 100%;
+        }
+        .audio-modal p { margin: 0 0 15px 0; font-size: 16px; color: #cdd6f4; }
+        .audio-modal input.name-input {
+            width: 90%; padding: 10px; border-radius: 6px; border: 1px solid #45475a;
+            background: #1e1e2e; color: #cdd6f4; margin-bottom: 15px; text-align: center; font-size: 16px;
+        }
+        .audio-modal button {
+            background: #f5c2e7; color: #11111b; border: none;
+            padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%;
+        }
+        #remoteMediaContainer { display: none; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <div class="lang-switcher">
-            <button id="langEn" class="lang-btn active">EN</button>
-            <button id="langRu" class="lang-btn">RU</button>
-            <button id="langUa" class="lang-btn">UA</button>
+<div id="nameSetupOverlay" class="audio-overlay" style="display: flex;">
+    <div class="audio-modal">
+        <p id="txt-name-prompt">Enter your nickname to start:</p>
+        <input type="text" id="usernameInput" class="name-input" maxlength="20" placeholder="Your name...">
+        <button id="saveNameBtn">Confirm</button>
+    </div>
+</div>
+
+<div id="audioActivationOverlay" class="audio-overlay">
+    <div class="audio-modal">
+        <p id="txt-modal-alert">Your browser blocked background audio. Click to activate stream.</p>
+        <button id="audioActivateBtn">Unmute Audio</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="lang-switcher">
+        <button class="lang-btn" id="btn-en" onclick="changeLanguage('en')">EN</button>
+        <button class="lang-btn" id="btn-uk" onclick="changeLanguage('uk')">UK</button>
+        <button class="lang-btn" id="btn-ru" onclick="changeLanguage('ru')">RU</button>
+    </div>
+
+    <h1 id="txt-title">Global HD Video Chat</h1>
+    <div class="room-badge" id="txt-badge">Room: World Wide</div>
+    
+    <button id="joinBtn" class="main-btn">Join Room</button>
+    
+    <div class="media-controls">
+        <button id="muteBtn" class="media-btn">Mute Mic</button>
+        <button id="flipCamBtn" class="media-btn">Flip Cam</button>
+    </div>
+    
+    <div class="status" id="statusText">Click button to connect...</div>
+
+    <div id="videoGrid" class="video-grid">
+        <div class="video-box local">
+            <video id="localVideo" autoplay playsinline muted></video>
+            <div class="video-label" id="lbl-me">You</div>
         </div>
-
-        <h1 id="mainTitle">Global Video & Paint Chat</h1>
-        <div id="roomBadge" class="room-badge">Room: World Wide Grid</div>
-
-        <div class="nickname-container">
-            <input type="text" id="nicknameInput" class="nickname-input" value="User" placeholder="Nickname" maxlength="25">
-            <button id="joinBtn" class="btn-join">Join Room</button>
+        <div class="video-box" id="remoteVideoBox">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div class="video-label" id="lbl-peer">Friend</div>
         </div>
-
-        <div id="statusDiv" class="status-container">Click button to connect...</div>
-
-        <div id="mediaControls" class="media-controls">
-            <button id="muteMicBtn" class="control-btn">
-                <span id="micIcon">🎤</span> <span id="micText">Mute Mic</span>
-            </button>
-            <button id="toggleCamBtn" class="control-btn">
-                <span id="camIcon">📷</span> <span id="camText">Cam Off</span>
-            </button>
-            <button id="switchCamBtn" class="control-btn" style="display: none;">
-                <span>🔄</span> <span id="switchCamText">Switch Camera</span>
-            </button>
-        </div>
-
-        <div id="hostPanel" class="host-panel">
-            <h3 id="hostPanelTitle">Moderator Control Panel</h3>
-            <div id="hostUsersList"></div>
-        </div>
-
-        <div id="videoGridWrapper" class="video-grid-wrapper">
-            <div id="videoGrid" class="video-grid"></div>
-        </div>
-
-        <div id="splitLayout" class="split-layout">
-            <div class="chat-container">
-                <div id="chatMessages" class="chat-messages"></div>
-                <div class="chat-input-row">
-                    <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
-                    <button id="sendMsgBtn" class="chat-send-btn">Send</button>
-                </div>
-            </div>
-
-            <div id="paintContainer" class="paint-container">
-                <div class="paint-toolbar">
-                    <div class="tool-group">
-                        <input type="color" id="brushColor" value="#cba6f7">
-                        <input type="range" id="brushSize" min="1" max="40" value="5">
-                        <input type="range" id="brushOpacity" min="0.1" max="1.0" step="0.1" value="1.0">
-                    </div>
-                    <div class="tool-group">
-                        <button id="undoBtn" class="history-btn">↶</button>
-                        <button id="redoBtn" class="history-btn">↷</button>
-                        <button id="clearBtn" class="history-btn clear-btn">🗑️ Clear</button>
-                    </div>
-                </div>
-                <canvas id="paintCanvas" width="500" height="320"></canvas>
-            </div>
-        </div>
-
-        <div class="control-row" style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
-            <button id="toggleLogBtn" class="toggle-log-btn">Show Console Logs</button>
-            <button id="emergencyRestartBtn" class="toggle-log-btn" style="background: #f38ba8; color: #11111b; font-weight: bold; border-radius: 6px; padding: 6px 12px; cursor: pointer; border: none;">Emergency Restart</button>
-        </div>
-        
-        <div id="logSection" class="log-section">
-            <div class="log-toolbar">
-                <button id="copyLogBtn" class="copy-log-btn">Copy Logs</button>
-            </div>
-            <div id="logDiv" class="log-output"></div>
+    </div>
+    
+    <div id="chatContainer" class="chat-container">
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
+            <button id="sendMsgBtn" class="chat-send-btn">Send</button>
         </div>
     </div>
 
-    <div id="audioOverlay" class="audio-blocker-overlay">
-        <h2 id="modalText" style="color: #f38ba8; max-width: 500px;">Your browser blocked background audio. Click to activate voice stream.</h2>
-        <button id="audioOverlayBtn" class="audio-blocker-btn">Unmute Audio</button>
+    <div id="paintContainer" class="paint-container">
+        <div class="paint-toolbar">
+            <div class="tool-group">
+                <input type="color" id="brushColor" value="#1e1e2e">
+                <input type="range" id="brushSize" min="1" max="40" value="5">
+                <input type="range" id="brushOpacity" min="0.1" max="1.0" step="0.1" value="1.0">
+            </div>
+            <div class="tool-group">
+                <button id="undoBtn" class="history-btn">↶</button>
+                <button id="redoBtn" class="history-btn">↷</button>
+                <button id="clearBtn" class="history-btn clear-btn">🗑️ Clear</button>
+            </div>
+        </div>
+        <canvas id="paintCanvas" width="440" height="300"></canvas>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
-    <script src="app.js"></script>
+    <button id="toggleLogBtn" class="toggle-log-btn">Show Console Logs</button>
+    
+    <div id="remoteMediaContainer"></div>
+    
+    <div id="logSection" class="log-container">
+        <button id="copyLogBtn" class="copy-btn">Copy Logs</button>
+        <div id="log">System ready.</div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="app.js"></script>
+
 </body>
 </html>
