@@ -107,11 +107,13 @@
 
         /* Видео контейнеры */
         .video-grid {
-            display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 15px;
-        }
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Авто-подбор колонок под количество гостей */
+    gap: 20px;
+    width: 100%;
+    max-width: 900px;
+    margin-top: 20px;
+}
         .video-box {
             background: #11111b;
             border: 1px solid #313244;
@@ -124,10 +126,11 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+			transform: scaleX(-1);
         }
-        .video-box.local video {
+        /*.video-box.local video {
             transform: scaleX(-1); /* Зеркалим локальную вебку */
-        }
+        } */
         .video-label {
             position: absolute;
             bottom: 5px;
@@ -303,23 +306,22 @@
     
     <button id="joinBtn" class="main-btn">Join Room</button>
     
-    <div class="media-controls">
+<div class="media-controls">
         <button id="muteBtn" class="media-btn">Mute Mic</button>
+        <button id="camOffBtn" class="media-btn">Turn Cam Off</button>
         <button id="flipCamBtn" class="media-btn">Flip Cam</button>
+        <button id="globalRestartBtn" class="media-btn" style="display: none; background: #f9e2af; color: #11111b;">🔄 Restart For All</button>
     </div>
     
     <div class="status" id="statusText">Click button to connect...</div>
 
-    <div id="videoGrid" class="video-grid">
-        <div class="video-box local">
-            <video id="localVideo" autoplay playsinline muted></video>
-            <div class="video-label" id="lbl-me">You</div>
-        </div>
-        <div class="video-box" id="remoteVideoBox">
-            <video id="remoteVideo" autoplay playsinline></video>
-            <div class="video-label" id="lbl-peer">Friend</div>
-        </div>
+<div id="videoGrid" class="video-grid" style="display: none;">
+    <div class="video-box local">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div id="lbl-me" class="video-label">You</div>
     </div>
+    <div id="remoteVideosContainer" style="display: contents;"></div>
+</div>
     
     <div id="chatContainer" class="chat-container">
         <div id="chatMessages" class="chat-messages"></div>
