@@ -107,11 +107,13 @@
 
         /* Видео контейнеры */
         .video-grid {
-            display: none;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 15px;
-        }
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Авто-подбор колонок под количество гостей */
+    gap: 20px;
+    width: 100%;
+    max-width: 900px;
+    margin-top: 20px;
+}
         .video-box {
             background: #11111b;
             border: 1px solid #313244;
@@ -313,16 +315,13 @@
     
     <div class="status" id="statusText">Click button to connect...</div>
 
-    <div id="videoGrid" class="video-grid">
-        <div class="video-box local">
-            <video id="localVideo" autoplay playsinline muted></video>
-            <div class="video-label" id="lbl-me">You</div>
-        </div>
-        <div class="video-box" id="remoteVideoBox">
-            <video id="remoteVideo" autoplay playsinline></video>
-            <div class="video-label" id="lbl-peer">Friend</div>
-        </div>
+<div id="videoGrid" class="video-grid" style="display: none;">
+    <div class="video-box local">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div id="lbl-me" class="video-label">You</div>
     </div>
+    <div id="remoteVideosContainer" style="display: contents;"></div>
+</div>
     
     <div id="chatContainer" class="chat-container">
         <div id="chatMessages" class="chat-messages"></div>
