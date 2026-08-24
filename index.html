@@ -28,6 +28,24 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-4 relative">
 
+    <!-- Кнопка переключения консоли (вверху слева) -->
+    <div class="absolute top-4 left-4 z-20">
+        <button id="toggleConsoleBtn" class="bg-gray-800 border border-gray-700 hover:bg-gray-700 font-semibold px-3 py-1.5 rounded-lg text-xs transition text-gray-300">
+            💻 Консоль логов (Скрыта)
+        </button>
+    </div>
+
+    <!-- Выпадающая консоль дебага -->
+    <div id="consoleBox" class="hidden w-full max-w-md bg-black/90 border border-gray-700 rounded-xl p-3 mb-4 font-mono text-xs z-20 shadow-xl">
+        <div class="flex justify-between items-center mb-2 pb-1 border-b border-gray-800">
+            <span class="text-indigo-400 font-bold">Логи подключения / Ошибки WebRTC</span>
+            <button onclick="clearConsole()" class="text-gray-500 hover:text-gray-300 text-[10px]">Очистить</button>
+        </div>
+        <div id="consoleLogs" class="h-40 overflow-y-auto flex flex-col gap-1 text-gray-300">
+            <p class="text-gray-500 italic">Инициализация логов зрителя...</p>
+        </div>
+    </div>
+
     <!-- Модальное окно выбора языка при входе -->
     <div id="langSelectModal" class="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
         <div class="bg-gray-800 border border-indigo-500 rounded-xl p-6 max-w-sm w-full text-center shadow-2xl">
@@ -113,6 +131,38 @@
     </div>
 
     <script>
+        const consoleLogs = document.getElementById('consoleLogs');
+        const consoleBox = document.getElementById('consoleBox');
+        const toggleConsoleBtn = document.getElementById('toggleConsoleBtn');
+
+        let isConsoleOpen = false;
+        toggleConsoleBtn.addEventListener('click', () => {
+            isConsoleOpen = !isConsoleOpen;
+            consoleBox.classList.toggle('hidden', !isConsoleOpen);
+            toggleConsoleBtn.textContent = isConsoleOpen ? "💻 Скрыть консоль логов" : "💻 Консоль логов (Скрыта)";
+        });
+
+        window.clearConsole = function() {
+            consoleLogs.innerHTML = '<p class="text-gray-500 italic">Консоль очищена...</p>';
+        }
+
+        function logToUI(text, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const p = document.createElement('p');
+            let colorClass = 'text-gray-300';
+            if (type === 'success') colorClass = 'text-green-400';
+            if (type === 'warn') colorClass = 'text-yellow-400';
+            if (type === 'error') colorClass = 'text-red-400';
+
+            p.className = `${colorClass} break-all`;
+            p.innerHTML = `<span class="text-gray-500">[${time}]</span> ${text}`;
+            consoleLogs.appendChild(p);
+            consoleLogs.scrollTop = consoleLogs.scrollHeight;
+            console.log(`[ViewerLog] ${text}`);
+        }
+
+        logToUI("Клиентская часть слушателя загружена.", "info");
+
         const firebaseConfig = {
             apiKey: "AIzaSyDsUxU99lIftxAtWjjzSoCQ8MnqaHsBp_A",
             authDomain: "live-52b7d.firebaseapp.com",
@@ -134,7 +184,7 @@
                 header: "Прямой аудиоэфир",
                 sub: "Запросите доступ к трансляции у администратора.",
                 reqBtn: "Запросить доступ",
-                reqSent: "Запрос отправлен...",
+                reqSent: "Попытка запроса...",
                 waitingAdmin: "Ожидаем, пока админ нажмет «Разрешить»...",
                 offline: "Стример офлайн. Ожидание запуска трансляции...",
                 online: "Стример в сети! Нажмите кнопку запроса.",
@@ -156,7 +206,7 @@
                 header: "Live Audio Stream",
                 sub: "Request access to the broadcast from the administrator.",
                 reqBtn: "Request Access",
-                reqSent: "Request sent...",
+                reqSent: "Requesting...",
                 waitingAdmin: "Waiting for admin to approve...",
                 offline: "Streamer is offline. Waiting for broadcast...",
                 online: "Streamer is online! Click the request button.",
@@ -196,6 +246,24 @@
         let myPeerId = null;
         const STORAGE_KEY = 'last_seen_stream_id';
 
+        const peerConfig = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:iphone-ice.apple.com:3478' },
+                    {
+                        urls: 'turn:openwebrtc.blockcv.com:3478?transport=udp',
+                        username: 'openwebrtc',
+                        credential: 'openwebrtcpassword'
+                    }
+                ],
+                iceCandidatePoolSize: 10,
+                sdpSemantics: 'unified-plan'
+            }
+        };
+
         if (currentLang) {
             langSelectModal.style.display = 'none';
             langToggleBtn.textContent = currentLang === 'ru' ? 'EN' : 'RU';
@@ -207,6 +275,7 @@
             localStorage.setItem('viewer_lang', lang);
             langSelectModal.style.display = 'none';
             langToggleBtn.textContent = lang === 'ru' ? 'EN' : 'RU';
+            logToUI(`Язык интерфейса изменен на: ${lang}`, "info");
             updateTexts();
             checkRoomStatusText();
         }
@@ -234,14 +303,8 @@
             
             const chatEmptyEl = document.getElementById('chatEmpty');
             if (chatEmptyEl) chatEmptyEl.textContent = t.chatEmpty;
-            
-            if (!detectedAdminId) {
-                adminIdInput.placeholder = t.waitingStreamer;
-            }
-            
-            if (!isStreamActive && requestBtn.textContent !== t.reqSent) {
-                requestBtn.textContent = t.reqBtn;
-            }
+            if (!detectedAdminId) adminIdInput.placeholder = t.waitingStreamer;
+            if (!isStreamActive && requestBtn.textContent !== t.reqSent) requestBtn.textContent = t.reqBtn;
         }
 
         let lastRoomIdValue = null;
@@ -254,9 +317,7 @@
 
             if (isInitialLoad) {
                 isInitialLoad = false;
-                if (roomId) {
-                    sessionStorage.setItem(STORAGE_KEY, roomId);
-                }
+                if (roomId) sessionStorage.setItem(STORAGE_KEY, roomId);
                 checkRoomStatusText();
                 return;
             }
@@ -267,16 +328,7 @@
                 return;
             }
 
-            if (roomId && !lastSeenRoomId) {
-                sessionStorage.setItem(STORAGE_KEY, roomId);
-                location.reload();
-                return;
-            }
-
-            if (!roomId && lastSeenRoomId) {
-                sessionStorage.removeItem(STORAGE_KEY);
-            }
-
+            if (!roomId && lastSeenRoomId) sessionStorage.removeItem(STORAGE_KEY);
             checkRoomStatusText();
         });
 
@@ -307,6 +359,7 @@
             }
         }
 
+        // Логика с автоматическими повторными попытками (Retry Logic) для США / межконтинентального соединения
         requestBtn.addEventListener('click', () => {
             if (!detectedAdminId) return;
             const t = translations[currentLang];
@@ -317,55 +370,93 @@
             statusMsg.textContent = t.waitingAdmin;
             statusMsg.className = 'text-xs text-yellow-400 mt-2';
 
-            viewerPeer = new Peer({
-                config: { 
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun.cloudflare.com:3478' }
-                    ] 
-                }
-            });
+            logToUI("Инициализация PeerJS клиента для зрителя...", "info");
+            viewerPeer = new Peer(peerConfig);
 
             viewerPeer.on('open', (id) => {
                 myPeerId = id;
+                logToUI(`Зритель зарегистрирован в сети PeerJS. ID: ${id}`, "success");
                 
                 const listenerKey = id.replace(/[.#$\/\[\]]/g, '_');
                 db.ref('activeStream/listeners/' + listenerKey).on('value', (snapshot) => {
-                    if (snapshot.exists()) {
-                        activatePlayerInterface(id, t);
-                    }
+                    if (snapshot.exists()) activatePlayerInterface(id, t);
                 });
 
-                const conn = viewerPeer.connect(detectedAdminId, { reliable: true });
+                // Функция отправки запроса со встроенными попытками (до 3 раз)
+                let attempt = 0;
+                const maxAttempts = 3;
 
-                conn.on('open', () => {
-                    conn.send({ type: 'request-access', peerId: id });
-                });
+                function tryConnectAndSend() {
+                    attempt++;
+                    logToUI(`Попытка подключения №${attempt} к стримеру: ${detectedAdminId}`, "info");
 
-                conn.on('data', (data) => {
-                    if (data.type === 'grant-access') {
-                        activatePlayerInterface(id, t);
-                    } else if (data.type === 'kick') {
-                        alert(currentLang === 'en' ? "You have been disconnected by the admin." : "Вас отключил администратор.");
-                        location.reload();
-                    }
-                });
+                    const conn = viewerPeer.connect(detectedAdminId, { reliable: true, serialization: 'json' });
+
+                    const timeout = setTimeout(() => {
+                        if (!conn.open) {
+                            logToUI(`Таймаут соединения на попытке №${attempt}`, "warn");
+                            conn.close();
+                            if (attempt < maxAttempts) {
+                                logToUI(`Повторная попытка через 2 сек...`, "info");
+                                setTimeout(tryConnectAndSend, 2000);
+                            } else {
+                                logToUI(`Не удалось установить канал данных после ${maxAttempts} попыток. Возможна блокировка фаерволом.`, "error");
+                                alert(currentLang === 'en' ? "Connection timed out. Please check your network or try again." : "Превышено время ожидания соединения. Проверьте сеть или повторите попытку.");
+                                requestBtn.disabled = false;
+                                requestBtn.textContent = t.reqBtn;
+                                requestBtn.className = 'w-full bg-indigo-600 hover:bg-indigo-700 font-semibold py-3 rounded-lg transition cursor-pointer';
+                            }
+                        }
+                    }, 4000);
+
+                    conn.on('open', () => {
+                        clearTimeout(timeout);
+                        logToUI("Канал данных со стримером открыт! Отправка запроса...", "success");
+                        conn.send({ type: 'request-access', peerId: id });
+                    });
+
+                    conn.on('data', (data) => {
+                        logToUI(`Получены данные от стримера: тип [${data.type}]`, "info");
+                        if (data.type === 'grant-access') {
+                            activatePlayerInterface(id, t);
+                        } else if (data.type === 'kick') {
+                            logToUI("Администратор принудительно отключил вас от эфира.", "warn");
+                            alert(currentLang === 'en' ? "You have been disconnected by the admin." : "Вас отключил администратор.");
+                            location.reload();
+                        }
+                    });
+
+                    conn.on('error', (err) => {
+                        logToUI(`Ошибка в канале данных: ${err.type || err}`, "error");
+                    });
+                }
+
+                tryConnectAndSend();
+            });
+
+            viewerPeer.on('error', (err) => {
+                logToUI(`Ошибка PeerJS у зрителя: [${err.type}] ${err.message}`, "error");
+                if (err.type === 'peer-unavailable') {
+                    logToUI("Стример не найден.", "error");
+                }
             });
 
             viewerPeer.on('call', (call) => {
+                logToUI("Получен входящий WebRTC аудиопоток от стримера!", "success");
                 call.answer();
                 if (myPeerId) activatePlayerInterface(myPeerId, t);
 
                 call.on('stream', (remoteStream) => {
+                    logToUI("Аудиопоток успешно принят.", "success");
                     remoteAudio.srcObject = remoteStream;
-                    remoteAudio.play().catch(() => {
+                    remoteAudio.play().catch((e) => {
+                        logToUI(`Автовоспроизведение заблокировано: ${e.message}`, "warn");
                         audioOverlay.style.display = 'flex';
                     });
                 });
 
                 call.on('close', () => {
+                    logToUI("WebRTC звонок завершен стримером.", "warn");
                     statusBadge.textContent = t.ended;
                     statusBadge.className = 'w-full bg-red-600/50 border border-red-500 font-semibold py-3 rounded-lg mb-4 text-sm';
                 });
@@ -375,6 +466,7 @@
         function activatePlayerInterface(peerId, t) {
             if (isStreamActive) return;
             isStreamActive = true;
+            logToUI("Интерфейс плеера активирован.", "success");
             
             step1Box.style.display = 'none';
             playerBox.style.display = 'block';
@@ -387,15 +479,9 @@
             const listenerRef = db.ref('activeStream/listeners/' + listenerKey);
 
             listenerRef.transaction((current) => {
-                if (!current) {
-                    return {
-                        peerId: peerId,
-                        connectedAt: Date.now()
-                    };
-                }
+                if (!current) return { peerId: peerId, connectedAt: Date.now() };
                 return current;
             });
-            
             listenerRef.onDisconnect().remove();
             listenChat();
         }
@@ -403,9 +489,8 @@
         function sendChatMessage() {
             const text = chatInput.value.trim();
             if (!text || !myPeerId) return;
-            const shortId = myPeerId.substring(0, 4);
             db.ref('activeStream/chat').push({
-                sender: `Гость (${shortId})`,
+                sender: 'Holly',
                 isStreamer: false,
                 text: text,
                 timestamp: Date.now()
@@ -423,15 +508,13 @@
             db.ref('activeStream/chat').on('value', (snapshot) => {
                 chatMessages.innerHTML = '';
                 const messages = snapshot.val();
-
                 if (!messages) {
                     chatMessages.innerHTML = `<p id="chatEmpty" class="text-gray-500 text-xs italic text-center">${t.chatEmpty}</p>`;
                     return;
                 }
-
                 Object.values(messages).forEach(msg => {
                     const div = document.createElement('div');
-                    div.className = msg.isStreamer ? 'text-indigo-400 font-semibold' : 'text-gray-200';
+                    div.className = msg.isStreamer ? 'text-indigo-400 font-semibold' : 'text-pink-400';
                     div.innerHTML = `<span class="text-xs text-gray-400">${escapeHtml(msg.sender)}:</span> ${escapeHtml(msg.text)}`;
                     chatMessages.appendChild(div);
                 });
@@ -440,29 +523,23 @@
         }
 
         unmuteBtn.addEventListener('click', () => {
+            logToUI("Пользователь разблокировал звук вручную.", "info");
             remoteAudio.play();
             audioOverlay.style.display = 'none';
         });
 
         window.sendReaction = function(emoji) {
-            db.ref('activeStream/reactions').push({
-                emoji: emoji,
-                timestamp: Date.now()
-            });
+            db.ref('activeStream/reactions').push({ emoji: emoji, timestamp: Date.now() });
         };
 
         function listenReactions() {
-            const reactionsRef = db.ref('activeStream/reactions');
-            reactionsRef.limitToLast(1).on('child_added', (snapshot) => {
+            db.ref('activeStream/reactions').limitToLast(1).on('child_added', (snapshot) => {
                 const data = snapshot.val();
-                if (data && data.emoji) {
-                    if (Date.now() - data.timestamp < 4000) {
-                        showFloatingReaction(data.emoji);
-                    }
+                if (data && data.emoji && (Date.now() - data.timestamp < 4000)) {
+                    showFloatingReaction(data.emoji);
                 }
             });
         }
-
         listenReactions();
 
         function showFloatingReaction(emoji) {
@@ -471,15 +548,9 @@
             const el = document.createElement('div');
             el.className = 'floating-reaction';
             el.textContent = emoji;
-            
-            const randomX = Math.floor(Math.random() * 80) + 10;
-            el.style.left = randomX + '%';
-
+            el.style.left = (Math.floor(Math.random() * 80) + 10) + '%';
             container.appendChild(el);
-
-            setTimeout(() => {
-                el.remove();
-            }, 3000);
+            setTimeout(() => el.remove(), 3000);
         }
 
         function escapeHtml(text) {
