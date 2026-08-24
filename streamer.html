@@ -28,6 +28,24 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-4 relative">
 
+    <!-- Кнопка переключения консоли (вверху слева) -->
+    <div class="absolute top-4 left-4 z-20">
+        <button id="toggleConsoleBtn" class="bg-gray-800 border border-gray-700 hover:bg-gray-700 font-semibold px-3 py-1.5 rounded-lg text-xs transition text-gray-300">
+            💻 Консоль логов (Скрыта)
+        </button>
+    </div>
+
+    <!-- Выпадающая консоль дебага -->
+    <div id="consoleBox" class="hidden w-full max-w-md bg-black/90 border border-gray-700 rounded-xl p-3 mb-4 font-mono text-xs z-20 shadow-xl">
+        <div class="flex justify-between items-center mb-2 pb-1 border-b border-gray-800">
+            <span class="text-indigo-400 font-bold">Системный лог / Ошибки WebRTC</span>
+            <button onclick="clearConsole()" class="text-gray-500 hover:text-gray-300 text-[10px]">Очистить</button>
+        </div>
+        <div id="consoleLogs" class="h-40 overflow-y-auto flex flex-col gap-1 text-gray-300">
+            <p class="text-gray-500 italic">Инициализация логов...</p>
+        </div>
+    </div>
+
     <!-- Контейнер для всплывающих реакций -->
     <div id="reactionsContainer" class="fixed inset-0 pointer-events-none z-50"></div>
 
@@ -43,7 +61,6 @@
             Запустить трансляцию
         </button>
 
-        <!-- Кнопка мьюта микрофона (скрыта до запуска) -->
         <button id="micToggleBtn" class="w-full bg-gray-700 hover:bg-gray-600 font-semibold py-2.5 rounded-lg transition mb-4 hidden text-sm">
             🎤 Микрофон: Включен
         </button>
@@ -79,7 +96,6 @@
                 <p class="text-gray-400 text-sm italic" id="noRequests">Нет запросов</p>
             </div>
 
-            <!-- Список активных слушателей -->
             <h2 class="text-lg font-semibold mb-2 border-t border-gray-700 pt-3">Слушают эфир сейчас:</h2>
             <div id="listenersList" class="space-y-2 max-h-40 overflow-y-auto">
                 <p class="text-gray-400 text-sm italic" id="noListeners">Никого нет в эфире</p>
@@ -88,6 +104,38 @@
     </div>
 
     <script>
+        const consoleLogs = document.getElementById('consoleLogs');
+        const consoleBox = document.getElementById('consoleBox');
+        const toggleConsoleBtn = document.getElementById('toggleConsoleBtn');
+
+        let isConsoleOpen = false;
+        toggleConsoleBtn.addEventListener('click', () => {
+            isConsoleOpen = !isConsoleOpen;
+            consoleBox.classList.toggle('hidden', !isConsoleOpen);
+            toggleConsoleBtn.textContent = isConsoleOpen ? "💻 Скрыть консоль логов" : "💻 Консоль логов (Скрыта)";
+        });
+
+        window.clearConsole = function() {
+            consoleLogs.innerHTML = '<p class="text-gray-500 italic">Консоль очищена...</p>';
+        }
+
+        function logToUI(text, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const p = document.createElement('p');
+            let colorClass = 'text-gray-300';
+            if (type === 'success') colorClass = 'text-green-400';
+            if (type === 'warn') colorClass = 'text-yellow-400';
+            if (type === 'error') colorClass = 'text-red-400';
+
+            p.className = `${colorClass} break-all`;
+            p.innerHTML = `<span class="text-gray-500">[${time}]</span> ${text}`;
+            consoleLogs.appendChild(p);
+            consoleLogs.scrollTop = consoleLogs.scrollHeight;
+            console.log(`[StreamerLog] ${text}`);
+        }
+
+        logToUI("Панель стримера инициализирована.", "info");
+
         const firebaseConfig = {
             apiKey: "AIzaSyDsUxU99lIftxAtWjjzSoCQ8MnqaHsBp_A",
             authDomain: "live-52b7d.firebaseapp.com",
@@ -117,12 +165,32 @@
         const chatInput = document.getElementById('chatInput');
         const sendChatBtn = document.getElementById('sendChatBtn');
 
+        const peerConfig = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:iphone-ice.apple.com:3478' },
+                    {
+                        urls: 'turn:openwebrtc.blockcv.com:3478?transport=udp',
+                        username: 'openwebrtc',
+                        credential: 'openwebrtcpassword'
+                    }
+                ],
+                iceCandidatePoolSize: 10,
+                sdpSemantics: 'unified-plan'
+            }
+        };
+
         startBtn.addEventListener('click', async () => {
+            logToUI("Запрос доступа к микрофону...", "info");
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({
                     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000 },
                     video: false
                 });
+                logToUI("Микрофон успешно запущен (48kHz, raw).", "success");
 
                 startBtn.disabled = true;
                 startBtn.classList.add('opacity-50');
@@ -130,18 +198,11 @@
                 chatInput.disabled = false;
                 sendChatBtn.disabled = false;
 
-                peer = new Peer(STREAMER_ROOM_ID, {
-                    config: { 
-                        iceServers: [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:stun2.l.google.com:19302' },
-                            { urls: 'stun:stun.cloudflare.com:3478' }
-                        ] 
-                    }
-                });
+                logToUI(`Инициализация PeerJS сервера с ID: ${STREAMER_ROOM_ID}`, "info");
+                peer = new Peer(STREAMER_ROOM_ID, peerConfig);
 
                 peer.on('open', (id) => {
+                    logToUI(`PeerJS соединение установлено успешно. ID: ${id}`, "success");
                     statusDiv.textContent = 'Статус: Онлайн (Эфир активен)';
                     statusDiv.className = 'mb-4 p-3 bg-green-900/50 border border-green-500 rounded text-center text-sm';
                     activeServerLabel.innerHTML = `ID стримера: <b class="text-indigo-300">${id}</b>`;
@@ -160,6 +221,10 @@
                     listenChat();
                 });
 
+                peer.on('error', (err) => {
+                    logToUI(`Ошибка PeerJS: [${err.type}] ${err.message}`, "error");
+                });
+
                 window.addEventListener('beforeunload', () => {
                     db.ref('activeStream/roomId').remove();
                     db.ref('activeStream/listeners').remove();
@@ -167,24 +232,32 @@
                 });
 
                 peer.on('connection', (conn) => {
+                    logToUI(`Входящее соединение данных от: ${conn.peer}`, "info");
                     clientConnections[conn.peer] = conn;
 
                     conn.on('data', (data) => {
+                        logToUI(`Получены данные от ${conn.peer}: тип [${data.type}]`, "info");
                         if (data.type === 'request-access') {
                             addRequestCard(conn.peer);
                         }
                     });
 
                     conn.on('close', () => {
+                        logToUI(`Соединение данных закрыто с: ${conn.peer}`, "warn");
                         document.getElementById(`req-${conn.peer}`)?.remove();
                         const safeKey = conn.peer.replace(/[.#$\/\[\]]/g, '_');
                         db.ref('activeStream/listeners/' + safeKey).remove();
                         delete clientConnections[conn.peer];
                         checkEmptyRequests();
                     });
+
+                    conn.on('error', (err) => {
+                        logToUI(`Ошибка в соединении с клиентом ${conn.peer}: ${err}`, "error");
+                    });
                 });
 
             } catch (err) {
+                logToUI(`Критическая ошибка микрофона/медиа: ${err.name} - ${err.message}`, "error");
                 alert('Ошибка микрофона: ' + err.message);
                 startBtn.disabled = false;
                 startBtn.classList.remove('opacity-50');
@@ -199,9 +272,11 @@
             });
 
             if (isMicMuted) {
+                logToUI("Микрофон приглушен (mute)", "warn");
                 micToggleBtn.textContent = '🔇 Микрофон: Выключен';
                 micToggleBtn.className = 'w-full bg-red-700/80 hover:bg-red-700 font-semibold py-2.5 rounded-lg transition mb-4 text-sm';
             } else {
+                logToUI("Микрофон включен (unmute)", "success");
                 micToggleBtn.textContent = '🎤 Микрофон: Включен';
                 micToggleBtn.className = 'w-full bg-gray-700 hover:bg-gray-600 font-semibold py-2.5 rounded-lg transition mb-4 text-sm';
             }
@@ -211,7 +286,7 @@
             const text = chatInput.value.trim();
             if (!text) return;
             db.ref('activeStream/chat').push({
-                sender: 'Стример',
+                sender: 'Bucket ASMR',
                 isStreamer: true,
                 text: text,
                 timestamp: Date.now()
@@ -228,16 +303,14 @@
             db.ref('activeStream/chat').on('value', (snapshot) => {
                 chatMessages.innerHTML = '';
                 const messages = snapshot.val();
-
                 if (!messages) {
                     chatMessages.innerHTML = '<p class="text-gray-500 text-xs italic text-center">Чат пуст...</p>';
                     return;
                 }
-
                 Object.values(messages).forEach(msg => {
                     const div = document.createElement('div');
-                    div.className = msg.isStreamer ? 'text-indigo-400 font-semibold' : 'text-gray-200';
-                    div.innerHTML = `<span class="text-xs text-gray-400">${msg.sender}:</span> ${escapeHtml(msg.text)}`;
+                    div.className = msg.isStreamer ? 'text-indigo-400 font-semibold' : 'text-pink-400';
+                    div.innerHTML = `<span class="text-xs text-gray-400">${escapeHtml(msg.sender)}:</span> ${escapeHtml(msg.text)}`;
                     chatMessages.appendChild(div);
                 });
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -245,20 +318,14 @@
         }
 
         window.sendReaction = function(emoji) {
-            db.ref('activeStream/reactions').push({
-                emoji: emoji,
-                timestamp: Date.now()
-            });
+            db.ref('activeStream/reactions').push({ emoji: emoji, timestamp: Date.now() });
         };
 
         function listenReactions() {
-            const reactionsRef = db.ref('activeStream/reactions');
-            reactionsRef.limitToLast(1).on('child_added', (snapshot) => {
+            db.ref('activeStream/reactions').limitToLast(1).on('child_added', (snapshot) => {
                 const data = snapshot.val();
-                if (data && data.emoji) {
-                    if (Date.now() - data.timestamp < 4000) {
-                        showFloatingReaction(data.emoji);
-                    }
+                if (data && data.emoji && (Date.now() - data.timestamp < 4000)) {
+                    showFloatingReaction(data.emoji);
                 }
             });
         }
@@ -267,12 +334,10 @@
             db.ref('activeStream/listeners').on('value', (snapshot) => {
                 listenersList.innerHTML = '';
                 const listeners = snapshot.val();
-
                 if (!listeners || Object.keys(listeners).length === 0) {
                     listenersList.innerHTML = '<p class="text-gray-400 text-sm italic" id="noListeners">Никого нет в эфире</p>';
                     return;
                 }
-
                 Object.keys(listeners).forEach(key => {
                     const listener = listeners[key];
                     const div = document.createElement('div');
@@ -288,6 +353,7 @@
         }
 
         window.kickListener = function(firebaseKey, peerId) {
+            logToUI(`Принудительное отключение слушателя: ${peerId}`, "warn");
             db.ref('activeStream/listeners/' + firebaseKey).remove();
             if (clientConnections[peerId]) {
                 clientConnections[peerId].send({ type: 'kick' });
@@ -300,26 +366,21 @@
             const container = document.getElementById('reactionsContainer');
             if (!container) return;
             const el = document.createElement('div');
-            el.className = 'floating-rotation floating-reaction';
+            el.className = 'floating-reaction';
             el.textContent = emoji;
-            
-            const randomX = Math.floor(Math.random() * 80) + 10;
-            el.style.left = randomX + '%';
-
+            el.style.left = (Math.floor(Math.random() * 80) + 10) + '%';
             container.appendChild(el);
-
-            setTimeout(() => {
-                el.remove();
-            }, 3000);
+            setTimeout(() => el.remove(), 3000);
         }
 
         function addRequestCard(guestId) {
             document.getElementById('noRequests')?.remove();
             if (document.getElementById(`req-${guestId}`)) return;
 
+            logToUI(`Получен запрос на подключение от гостя: ${guestId}`, "success");
             const div = document.createElement('div');
             div.id = `req-${guestId}`;
-            div.className = 'bg-gray-700 p-3 rounded text-sm flex items-center justify-between';
+            div.className = 'bg-gray-700 p-3 rounded text-sm flex items-center justify-between border border-indigo-500/50';
             div.innerHTML = `
                 <span class="text-xs text-gray-300 truncate max-w-[150px]">Гость: ${guestId.substring(0, 8)}...</span>
                 <button onclick="approveGuest('${guestId}')" class="bg-green-600 hover:bg-green-500 px-3 py-1.5 rounded text-xs font-semibold">Разрешить</button>
@@ -328,13 +389,18 @@
         }
 
         window.approveGuest = function(guestId) {
+            logToUI(`Одобрен доступ для гостя: ${guestId}. Инициализация WebRTC звонка...`, "success");
             document.getElementById(`req-${guestId}`)?.remove();
             checkEmptyRequests();
 
             if (peer && localStream) {
-                peer.call(guestId, localStream);
+                const call = peer.call(guestId, localStream);
+                call.on('error', (err) => {
+                    logToUI(`Ошибка WebRTC звонка слушателю ${guestId}: ${err}`, "error");
+                });
+
                 const conn = clientConnections[guestId];
-                if (conn) {
+                if (conn && conn.open) {
                     conn.send({ type: 'grant-access' });
                 }
             }
