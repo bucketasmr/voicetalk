@@ -28,6 +28,7 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-4 relative">
 
+    <!-- Контейнер для всплывающих реакций -->
     <div id="reactionsContainer" class="fixed inset-0 pointer-events-none z-50"></div>
 
     <div class="max-w-md w-full bg-gray-800 rounded-xl p-6 shadow-2xl border border-gray-700 z-10">
@@ -42,10 +43,12 @@
             Запустить трансляцию
         </button>
 
+        <!-- Кнопка мьюта микрофона (скрыта до запуска) -->
         <button id="micToggleBtn" class="w-full bg-gray-700 hover:bg-gray-600 font-semibold py-2.5 rounded-lg transition mb-4 hidden text-sm">
             🎤 Микрофон: Включен
         </button>
 
+        <!-- Панель реакций для стримера -->
         <div class="mb-4 pt-2 border-t border-gray-700">
             <p class="text-xs text-gray-400 mb-2">Отправить реакцию (видна всем):</p>
             <div class="flex justify-center gap-2">
@@ -58,6 +61,7 @@
             </div>
         </div>
 
+        <!-- Чат стрима -->
         <div class="border-t border-gray-700 pt-4 mb-4">
             <h2 class="text-lg font-semibold mb-2">Чат трансляции:</h2>
             <div id="chatMessages" class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 h-36 overflow-y-auto flex flex-col gap-2 mb-2 text-sm">
@@ -75,6 +79,7 @@
                 <p class="text-gray-400 text-sm italic" id="noRequests">Нет запросов</p>
             </div>
 
+            <!-- Список активных слушателей -->
             <h2 class="text-lg font-semibold mb-2 border-t border-gray-700 pt-3">Слушают эфир сейчас:</h2>
             <div id="listenersList" class="space-y-2 max-h-40 overflow-y-auto">
                 <p class="text-gray-400 text-sm italic" id="noListeners">Никого нет в эфире</p>
@@ -112,26 +117,22 @@
         const chatInput = document.getElementById('chatInput');
         const sendChatBtn = document.getElementById('sendChatBtn');
 
-        // ЖЕЛЕЗОБЕТОННЫЕ настройки ICE с добавлением TURN серверов
-        const peerIceConfig = {
-            config: { 
+        // Расширенная конфигурация с STUN и TURN серверами[cite: 14]
+        const peerConfig = {
+            config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
                     { urls: 'stun:stun.cloudflare.com:3478' },
-                    // Бесплатные резервные TURN-серверы для обхода жестких файрволов (США и др.)
+                    { urls: 'stun:iphone-ice.apple.com:3478' },
                     {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:443',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
+                        urls: 'turn:openwebrtc.blockcv.com:3478?transport=udp',
+                        username: 'openwebrtc',
+                        credential: 'openwebrtcpassword'
                     }
                 ],
-                iceTransportPolicy: 'all'
+                iceCandidatePoolSize: 10,
+                sdpSemantics: 'unified-plan'
             }
         };
 
@@ -148,7 +149,8 @@
                 chatInput.disabled = false;
                 sendChatBtn.disabled = false;
 
-                peer = new Peer(STREAMER_ROOM_ID, peerIceConfig);
+                // Передаем peerConfig при создании Peer[cite: 14]
+                peer = new Peer(STREAMER_ROOM_ID, peerConfig);
 
                 peer.on('open', (id) => {
                     statusDiv.textContent = 'Статус: Онлайн (Эфир активен)';
@@ -191,10 +193,6 @@
                         delete clientConnections[conn.peer];
                         checkEmptyRequests();
                     });
-                });
-
-                peer.on('error', (err) => {
-                    console.error('PeerJS error:', err);
                 });
 
             } catch (err) {
@@ -309,22 +307,22 @@
             }
         };
 
-    function showFloatingReaction(emoji) {
-        const container = document.getElementById('reactionsContainer');
-        if (!container) return;
-        const el = document.createElement('div');
-        el.className = 'floating-rotation floating-reaction';
-        el.textContent = emoji;
-        
-        const randomX = Math.floor(Math.random() * 80) + 10;
-        el.style.left = randomX + '%';
+        function showFloatingReaction(emoji) {
+            const container = document.getElementById('reactionsContainer');
+            if (!container) return;
+            const el = document.createElement('div');
+            el.className = 'floating-rotation floating-reaction';
+            el.textContent = emoji;
+            
+            const randomX = Math.floor(Math.random() * 80) + 10;
+            el.style.left = randomX + '%';
 
-        container.appendChild(el);
+            container.appendChild(el);
 
-        setTimeout(() => {
-            el.remove();
-        }, 3000);
-    }
+            setTimeout(() => {
+                el.remove();
+            }, 3000);
+        }
 
         function addRequestCard(guestId) {
             document.getElementById('noRequests')?.remove();
@@ -365,3 +363,511 @@
     </script>
 </body>
 </html>
+```[cite: 16]
+
+---
+
+### 2. Сторінка Слухача (`viewer.html`)
+
+```html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">Эфир - Прослушивание</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- Firebase Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <style>
+        @keyframes floatUp {
+            0% { transform: translateY(0px) scale(1); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-550px) scale(1); opacity: 0; }
+        }
+        .floating-reaction {
+            position: fixed;
+            bottom: 20px;
+            animation: floatUp 3s linear forwards;
+            pointer-events: none;
+            z-index: 9999;
+            font-size: 2.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-4 relative">
+
+    <!-- Модальное окно выбора языка при входе -->
+    <div id="langSelectModal" class="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-indigo-500 rounded-xl p-6 max-w-sm w-full text-center shadow-2xl">
+            <h2 class="text-xl font-bold mb-2 text-indigo-400">Выберите язык / Select Language</h2>
+            <p class="text-gray-400 text-sm mb-6">Пожалуйста, выберите язык интерфейса:</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="setLanguage('ru')" class="w-full bg-indigo-600 hover:bg-indigo-700 font-semibold py-3 rounded-lg transition text-white">
+                    🇷🇺 Русский
+                </button>
+                <button onclick="setLanguage('en')" class="w-full bg-gray-700 hover:bg-gray-600 font-semibold py-3 rounded-lg transition text-white">
+                    🇬🇧 English
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="absolute top-4 right-4 z-20">
+        <button id="langToggleBtn" class="bg-gray-800 border border-gray-700 hover:bg-gray-700 font-bold px-3 py-1.5 rounded-lg text-sm transition">
+            EN
+        </button>
+    </div>
+
+    <!-- Контейнер для всплывающих реакций -->
+    <div id="reactionsContainer" class="fixed inset-0 pointer-events-none z-50"></div>
+
+    <!-- Модальное окно для разблокировки звука на мобильных -->
+    <div id="audioOverlay" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 border border-indigo-500 rounded-xl p-6 max-w-sm text-center">
+            <p id="modalText" class="text-sm mb-4 text-gray-200">Админ одобрил подключение! Нажмите для включения звука:</p>
+            <button id="unmuteBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 font-semibold py-3 rounded-lg text-white">
+                Слушать эфир / Listen
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-md w-full bg-gray-800 rounded-xl p-6 shadow-2xl border border-gray-700 text-center z-10">
+        <h1 id="mainHeader" class="text-2xl font-bold mb-2 text-indigo-400">Прямой аудиоэфир</h1>
+        <p id="subHeader" class="text-gray-400 text-sm mb-6">Запросите доступ к трансляции у администратора.</p>
+
+        <div id="step1Box" class="mb-4">
+            <div class="mb-3">
+                <input type="text" id="adminIdInput" readonly placeholder="Ожидание стримера..." class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-center text-white text-sm focus:outline-none">
+            </div>
+            <button id="requestBtn" disabled class="w-full bg-gray-600 opacity-50 font-semibold py-3 rounded-lg transition cursor-not-allowed">
+                Запросить доступ
+            </button>
+        </div>
+
+        <div id="playerBox" class="hidden">
+            <div id="statusBadge" class="w-full bg-yellow-600/50 border border-yellow-500 font-semibold py-3 rounded-lg mb-4 text-sm">
+                Ожидание подтверждения от админа...
+            </div>
+            
+            <!-- Панель реакций -->
+            <div class="mb-4 pt-2 border-t border-gray-700">
+                <p id="reactionsLabel" class="text-xs text-gray-400 mb-2">Отправить ASMR-реакцию:</p>
+                <div class="flex justify-center gap-2">
+                    <button onclick="sendReaction('💤')" class="bg-gray-700 hover:bg-gray-600 p-2.5 rounded-xl text-xl transition transform hover:scale-110">💤</button>
+                    <button onclick="sendReaction('✨')" class="bg-gray-700 hover:bg-gray-600 p-2.5 rounded-xl text-xl transition transform hover:scale-110">✨</button>
+                    <button onclick="sendReaction('💜')" class="bg-gray-700 hover:bg-gray-600 p-2.5 rounded-xl text-xl transition transform hover:scale-110">💜</button>
+                    <button onclick="sendReaction('🌙')" class="bg-gray-700 hover:bg-gray-600 p-2.5 rounded-xl text-xl transition transform hover:scale-110">🌙</button>
+                    <button onclick="sendReaction('🫧')" class="bg-gray-700 hover:bg-gray-600 p-2.5 rounded-xl text-xl transition transform hover:scale-110">🫧</button>
+                    <button onclick="sendReaction('🐜')" class="bg-gray-700 hover:bg-gray-600 p-2.5 rounded-xl text-xl transition transform hover:scale-110">🐜</button>
+                </div>
+            </div>
+
+            <!-- Чат для зрителя -->
+            <div class="border-t border-gray-700 pt-3 mb-4 text-left">
+                <p id="chatLabel" class="text-xs text-gray-400 mb-2">Чат трансляции:</p>
+                <div id="chatMessages" class="bg-gray-900/60 border border-gray-700 rounded-lg p-3 h-32 overflow-y-auto flex flex-col gap-2 mb-2 text-sm">
+                    <p id="chatEmpty" class="text-gray-500 text-xs italic text-center">Чат пуст...</p>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="chatInput" placeholder="Ваше сообщение..." class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                    <button id="sendChatBtn" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold transition">Отправить</button>
+                </div>
+            </div>
+
+            <audio id="remoteAudio" autoplay playsinline></audio>
+        </div>
+
+        <p id="statusMsg" class="text-xs text-gray-400 mt-2">Подключение к базе данных...</p>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDsUxU99lIftxAtWjjzSoCQ8MnqaHsBp_A",
+            authDomain: "live-52b7d.firebaseapp.com",
+            databaseURL: "https://live-52b7d-default-rtdb.firebaseio.com",
+            projectId: "live-52b7d",
+            storageBucket: "live-52b7d.firebasestorage.app",
+            messagingSenderId: "640950676167",
+            appId: "1:640950676167:web:51ffa9884adbbb32c4ace2",
+            measurementId: "G-8V3GYSJKTV"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let currentLang = localStorage.getItem('viewer_lang') || null;
+        
+        const translations = {
+            ru: {
+                title: "Эфир - Прослушивание",
+                header: "Прямой аудиоэфир",
+                sub: "Запросите доступ к трансляции у администратора.",
+                reqBtn: "Запросить доступ",
+                reqSent: "Запрос отправлен...",
+                waitingAdmin: "Ожидаем, пока админ нажмет «Разрешить»...",
+                offline: "Стример офлайн. Ожидание запуска трансляции...",
+                online: "Стример в сети! Нажмите кнопку запроса.",
+                waitingApproval: "Ожидание подтверждения от админа...",
+                approved: "Админ одобрил! Ожидание потока...",
+                live: "Прямой эфир идет",
+                ended: "Эфир завершен.",
+                modal: "Админ одобрил подключение! Нажмите для включения звука:",
+                unmute: "Слушать эфир",
+                reactLabel: "Отправить ASMR-реакцию:",
+                waitingStreamer: "Ожидание стримера...",
+                chatLabel: "Чат трансляции:",
+                chatPlaceholder: "Ваше сообщение...",
+                chatSend: "Отправить",
+                chatEmpty: "Чат пуст..."
+            },
+            en: {
+                title: "Live Stream - Listening",
+                header: "Live Audio Stream",
+                sub: "Request access to the broadcast from the administrator.",
+                reqBtn: "Request Access",
+                reqSent: "Request sent...",
+                waitingAdmin: "Waiting for admin to approve...",
+                offline: "Streamer is offline. Waiting for broadcast...",
+                online: "Streamer is online! Click the request button.",
+                waitingApproval: "Waiting for admin approval...",
+                approved: "Admin approved! Waiting for stream...",
+                live: "Live Stream Active",
+                ended: "Stream ended.",
+                modal: "Admin approved! Click to enable sound:",
+                unmute: "Listen to Stream",
+                reactLabel: "Send ASMR reaction:",
+                waitingStreamer: "Waiting for streamer...",
+                chatLabel: "Stream Chat:",
+                chatPlaceholder: "Your message...",
+                chatSend: "Send",
+                chatEmpty: "Chat is empty..."
+            }
+        };
+
+        const adminIdInput = document.getElementById('adminIdInput');
+        const requestBtn = document.getElementById('requestBtn');
+        const step1Box = document.getElementById('step1Box');
+        const playerBox = document.getElementById('playerBox');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusMsg = document.getElementById('statusMsg');
+        const remoteAudio = document.getElementById('remoteAudio');
+        const audioOverlay = document.getElementById('audioOverlay');
+        const unmuteBtn = document.getElementById('unmuteBtn');
+        const langToggleBtn = document.getElementById('langToggleBtn');
+        const langSelectModal = document.getElementById('langSelectModal');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+
+        let viewerPeer = null;
+        let detectedAdminId = '';
+        let isStreamActive = false;
+        let myPeerId = null;
+        const STORAGE_KEY = 'last_seen_stream_id';
+
+        // Расширенная конфигурация с STUN и TURN серверами[cite: 14]
+        const peerConfig = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:iphone-ice.apple.com:3478' },
+                    {
+                        urls: 'turn:openwebrtc.blockcv.com:3478?transport=udp',
+                        username: 'openwebrtc',
+                        credential: 'openwebrtcpassword'
+                    }
+                ],
+                iceCandidatePoolSize: 10,
+                sdpSemantics: 'unified-plan'
+            }
+        };
+
+        if (currentLang) {
+            langSelectModal.style.display = 'none';
+            langToggleBtn.textContent = currentLang === 'ru' ? 'EN' : 'RU';
+            updateTexts();
+        }
+
+        window.setLanguage = function(lang) {
+            currentLang = lang;
+            localStorage.setItem('viewer_lang', lang);
+            langSelectModal.style.display = 'none';
+            langToggleBtn.textContent = lang === 'ru' ? 'EN' : 'RU';
+            updateTexts();
+            checkRoomStatusText();
+        }
+
+        langToggleBtn.addEventListener('click', () => {
+            currentLang = currentLang === 'ru' ? 'en' : 'ru';
+            localStorage.setItem('viewer_lang', currentLang);
+            langToggleBtn.textContent = currentLang === 'ru' ? 'EN' : 'RU';
+            updateTexts();
+            checkRoomStatusText();
+        });
+
+        function updateTexts() {
+            if (!currentLang) return;
+            const t = translations[currentLang];
+            document.getElementById('pageTitle').textContent = t.title;
+            document.getElementById('mainHeader').textContent = t.header;
+            document.getElementById('subHeader').textContent = t.sub;
+            document.getElementById('modalText').textContent = t.modal;
+            document.getElementById('unmuteBtn').textContent = t.unmute;
+            document.getElementById('reactionsLabel').textContent = t.reactLabel;
+            document.getElementById('chatLabel').textContent = t.chatLabel;
+            chatInput.placeholder = t.chatPlaceholder;
+            sendChatBtn.textContent = t.chatSend;
+            
+            const chatEmptyEl = document.getElementById('chatEmpty');
+            if (chatEmptyEl) chatEmptyEl.textContent = t.chatEmpty;
+            
+            if (!detectedAdminId) {
+                adminIdInput.placeholder = t.waitingStreamer;
+            }
+            
+            if (!isStreamActive && requestBtn.textContent !== t.reqSent) {
+                requestBtn.textContent = t.reqBtn;
+            }
+        }
+
+        let lastRoomIdValue = null;
+        let isInitialLoad = true;
+
+        db.ref('activeStream/roomId').on('value', (snapshot) => {
+            const roomId = snapshot.val();
+            lastRoomIdValue = roomId;
+            const lastSeenRoomId = sessionStorage.getItem(STORAGE_KEY);
+
+            if (isInitialLoad) {
+                isInitialLoad = false;
+                if (roomId) {
+                    sessionStorage.setItem(STORAGE_KEY, roomId);
+                }
+                checkRoomStatusText();
+                return;
+            }
+
+            if (roomId && lastSeenRoomId && lastSeenRoomId !== roomId) {
+                sessionStorage.setItem(STORAGE_KEY, roomId);
+                location.reload();
+                return;
+            }
+
+            if (roomId && !lastSeenRoomId) {
+                sessionStorage.setItem(STORAGE_KEY, roomId);
+                location.reload();
+                return;
+            }
+
+            if (!roomId && lastSeenRoomId) {
+                sessionStorage.removeItem(STORAGE_KEY);
+            }
+
+            checkRoomStatusText();
+        });
+
+        function checkRoomStatusText() {
+            if (!currentLang) return;
+            const t = translations[currentLang];
+            const roomId = lastRoomIdValue;
+
+            if (roomId) {
+                detectedAdminId = roomId;
+                adminIdInput.value = roomId;
+                if (!isStreamActive && requestBtn.textContent !== t.reqSent) {
+                    requestBtn.disabled = false;
+                    requestBtn.className = 'w-full bg-indigo-600 hover:bg-indigo-700 font-semibold py-3 rounded-lg transition cursor-pointer';
+                    requestBtn.textContent = t.reqBtn;
+                }
+                statusMsg.textContent = t.online;
+                statusMsg.className = 'text-xs text-green-400 mt-2';
+            } else {
+                detectedAdminId = '';
+                adminIdInput.value = '';
+                adminIdInput.placeholder = t.waitingStreamer;
+                requestBtn.disabled = true;
+                requestBtn.className = 'w-full bg-gray-600 opacity-50 font-semibold py-3 rounded-lg transition cursor-not-allowed';
+                requestBtn.textContent = t.reqBtn;
+                statusMsg.textContent = t.offline;
+                statusMsg.className = 'text-xs text-yellow-400 mt-2';
+            }
+        }
+
+        requestBtn.addEventListener('click', () => {
+            if (!detectedAdminId) return;
+            const t = translations[currentLang];
+
+            requestBtn.disabled = true;
+            requestBtn.className = 'w-full bg-gray-600 font-semibold py-3 rounded-lg opacity-50 cursor-wait';
+            requestBtn.textContent = t.reqSent;
+            statusMsg.textContent = t.waitingAdmin;
+            statusMsg.className = 'text-xs text-yellow-400 mt-2';
+
+            // Передаем peerConfig при создании Peer для зрителя[cite: 14]
+            viewerPeer = new Peer(peerConfig);
+
+            viewerPeer.on('open', (id) => {
+                myPeerId = id;
+                
+                const listenerKey = id.replace(/[.#$\/\[\]]/g, '_');
+                db.ref('activeStream/listeners/' + listenerKey).on('value', (snapshot) => {
+                    if (snapshot.exists()) {
+                        activatePlayerInterface(id, t);
+                    }
+                });
+
+                const conn = viewerPeer.connect(detectedAdminId, { reliable: true });
+
+                conn.on('open', () => {
+                    conn.send({ type: 'request-access', peerId: id });
+                });
+
+                conn.on('data', (data) => {
+                    if (data.type === 'grant-access') {
+                        activatePlayerInterface(id, t);
+                    } else if (data.type === 'kick') {
+                        alert(currentLang === 'en' ? "You have been disconnected by the admin." : "Вас отключил администратор.");
+                        location.reload();
+                    }
+                });
+            });
+
+            viewerPeer.on('call', (call) => {
+                call.answer();
+                if (myPeerId) activatePlayerInterface(myPeerId, t);
+
+                call.on('stream', (remoteStream) => {
+                    remoteAudio.srcObject = remoteStream;
+                    remoteAudio.play().catch(() => {
+                        audioOverlay.style.display = 'flex';
+                    });
+                });
+
+                call.on('close', () => {
+                    statusBadge.textContent = t.ended;
+                    statusBadge.className = 'w-full bg-red-600/50 border border-red-500 font-semibold py-3 rounded-lg mb-4 text-sm';
+                });
+            });
+        });
+
+        function activatePlayerInterface(peerId, t) {
+            if (isStreamActive) return;
+            isStreamActive = true;
+            
+            step1Box.style.display = 'none';
+            playerBox.style.display = 'block';
+            statusMsg.textContent = '';
+            
+            statusBadge.textContent = t.live;
+            statusBadge.className = 'w-full bg-green-600/50 border border-green-500 font-semibold py-3 rounded-lg mb-4 text-sm';
+
+            const listenerKey = peerId.replace(/[.#$\/\[\]]/g, '_');
+            const listenerRef = db.ref('activeStream/listeners/' + listenerKey);
+
+            listenerRef.transaction((current) => {
+                if (!current) {
+                    return {
+                        peerId: peerId,
+                        connectedAt: Date.now()
+                    };
+                }
+                return current;
+            });
+            
+            listenerRef.onDisconnect().remove();
+            listenChat();
+        }
+
+        function sendChatMessage() {
+            const text = chatInput.value.trim();
+            if (!text || !myPeerId) return;
+            db.ref('activeStream/chat').push({
+                sender: 'Holly',
+                isStreamer: false,
+                text: text,
+                timestamp: Date.now()
+            });
+            chatInput.value = '';
+        }
+
+        sendChatBtn.addEventListener('click', sendChatMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+
+        function listenChat() {
+            const t = translations[currentLang || 'ru'];
+            db.ref('activeStream/chat').on('value', (snapshot) => {
+                chatMessages.innerHTML = '';
+                const messages = snapshot.val();
+
+                if (!messages) {
+                    chatMessages.innerHTML = `<p id="chatEmpty" class="text-gray-500 text-xs italic text-center">${t.chatEmpty}</p>`;
+                    return;
+                }
+
+                Object.values(messages).forEach(msg => {
+                    const div = document.createElement('div');
+                    div.className = msg.isStreamer ? 'text-indigo-400 font-semibold' : 'text-pink-400';
+                    div.innerHTML = `<span class="text-xs text-gray-400">${escapeHtml(msg.sender)}:</span> ${escapeHtml(msg.text)}`;
+                    chatMessages.appendChild(div);
+                });
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+        }
+
+        unmuteBtn.addEventListener('click', () => {
+            remoteAudio.play();
+            audioOverlay.style.display = 'none';
+        });
+
+        window.sendReaction = function(emoji) {
+            db.ref('activeStream/reactions').push({
+                emoji: emoji,
+                timestamp: Date.now()
+            });
+        };
+
+        function listenReactions() {
+            const reactionsRef = db.ref('activeStream/reactions');
+            reactionsRef.limitToLast(1).on('child_added', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.emoji) {
+                    if (Date.now() - data.timestamp < 4000) {
+                        showFloatingReaction(data.emoji);
+                    }
+                }
+            });
+        }
+
+        listenReactions();
+
+        function showFloatingReaction(emoji) {
+            const container = document.getElementById('reactionsContainer');
+            if (!container) return;
+            const el = document.createElement('div');
+            el.className = 'floating-reaction';
+            el.textContent = emoji;
+            
+            const randomX = Math.floor(Math.random() * 80) + 10;
+            el.style.left = randomX + '%';
+
+            container.appendChild(el);
+
+            setTimeout(() => {
+                el.remove();
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+</body>
+</html>
+```[cite: 17]
