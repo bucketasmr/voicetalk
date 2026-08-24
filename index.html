@@ -359,7 +359,7 @@
             }
         }
 
-        // Логика с автоматическими повторными попытками (Retry Logic) для США / межконтинентального соединения
+        // Логика с автоматическими повторными попытками (до 10 раз) для надежного соединения
         requestBtn.addEventListener('click', () => {
             if (!detectedAdminId) return;
             const t = translations[currentLang];
@@ -382,13 +382,13 @@
                     if (snapshot.exists()) activatePlayerInterface(id, t);
                 });
 
-                // Функция отправки запроса со встроенными попытками (до 3 раз)
+                // Увеличено до 10 попыток подключения
                 let attempt = 0;
-                const maxAttempts = 3;
+                const maxAttempts = 10;
 
                 function tryConnectAndSend() {
                     attempt++;
-                    logToUI(`Попытка подключения №${attempt} к стримеру: ${detectedAdminId}`, "info");
+                    logToUI(`Попытка подключения №${attempt} из ${maxAttempts} к стримеру: ${detectedAdminId}`, "info");
 
                     const conn = viewerPeer.connect(detectedAdminId, { reliable: true, serialization: 'json' });
 
@@ -401,7 +401,7 @@
                                 setTimeout(tryConnectAndSend, 2000);
                             } else {
                                 logToUI(`Не удалось установить канал данных после ${maxAttempts} попыток. Возможна блокировка фаерволом.`, "error");
-                                alert(currentLang === 'en' ? "Connection timed out. Please check your network or try again." : "Превышено время ожидания соединения. Проверьте сеть или повторите попытку.");
+                                alert(currentLang === 'en' ? "Connection timed out after multiple attempts. Please check your network or try again." : "Превышено время ожидания соединения после 10 попыток. Проверьте сеть или повторите попытку.");
                                 requestBtn.disabled = false;
                                 requestBtn.textContent = t.reqBtn;
                                 requestBtn.className = 'w-full bg-indigo-600 hover:bg-indigo-700 font-semibold py-3 rounded-lg transition cursor-pointer';
