@@ -131,7 +131,14 @@
                 sendChatBtn.disabled = false;
 
                 peer = new Peer(STREAMER_ROOM_ID, {
-                    config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }] }
+                    config: { 
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun.cloudflare.com:3478' }
+                        ] 
+                    }
                 });
 
                 peer.on('open', (id) => {
@@ -144,7 +151,6 @@
                     db.ref('activeStream/listeners').onDisconnect().remove();
                     db.ref('activeStream/chat').onDisconnect().remove();
 
-                    // Очищаем старые данные при запуске нового эфира[cite: 10]
                     db.ref('activeStream/reactions').remove();
                     db.ref('activeStream/listeners').remove();
                     db.ref('activeStream/chat').remove();
@@ -201,12 +207,11 @@
             }
         });
 
-        // Отправка сообщения в чат от стримера
         function sendChatMessage() {
             const text = chatInput.value.trim();
             if (!text) return;
             db.ref('activeStream/chat').push({
-                sender: 'Стример',
+                sender: 'Bucket ASMR',
                 isStreamer: true,
                 text: text,
                 timestamp: Date.now()
@@ -231,8 +236,8 @@
 
                 Object.values(messages).forEach(msg => {
                     const div = document.createElement('div');
-                    div.className = msg.isStreamer ? 'text-indigo-400 font-semibold' : 'text-gray-200';
-                    div.innerHTML = `<span class="text-xs text-gray-400">${msg.sender}:</span> ${escapeHtml(msg.text)}`;
+                    div.className = msg.isStreamer ? 'text-indigo-400 font-semibold' : 'text-pink-400';
+                    div.innerHTML = `<span class="text-xs text-gray-400">${escapeHtml(msg.sender)}:</span> ${escapeHtml(msg.text)}`;
                     chatMessages.appendChild(div);
                 });
                 chatMessages.scrollTop = chatMessages.scrollHeight;
